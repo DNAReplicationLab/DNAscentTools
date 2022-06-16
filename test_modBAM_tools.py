@@ -31,6 +31,12 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             "899300\t0.014683\tTGGGAG\n"
             "899312\t0.186812\tTAACGG\n"
             "899320\t0.934850\tTTATTG\n"
+            ">c6785e1f-10d2-49cb-8ca3-e8d48979001b chrXIII 74003 81176 rev\n"
+            "74010\t0.012874\tTCTCTA\n"
+            "74011\t0.012428\tCTCTAA\n"
+            "74014\t0.016811\tTAACGA\n"
+            "74017\t0.013372\tCGACCA\n"
+            "74018\t0.013836\tGACCAA\n"
             )
 
     def test_get_gaps_in_base_pos(self):
@@ -76,6 +82,18 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                     0.186812, 0.934850],
                 "sixMerOnRef": ["TCAAAT", "TCCACA", "TGGGAG", 
                     "TAACGG", "TTATTG"]
+            },
+            {
+                "readID": "c6785e1f-10d2-49cb-8ca3-e8d48979001b",
+                "refContig": "chrXIII",
+                "refStart": 74003,
+                "refEnd": 81176,
+                "strand": "rev",
+                "posOnRef": [74010,74011,74014,74017,74018],
+                "probBrdU": [0.012874, 0.012428, 0.016811, 
+                    0.013372, 0.013836],
+                "sixMerOnRef": ["TCTCTA", "CTCTAA", "TAACGA", 
+                    "CGACCA", "GACCAA"]
             }
         ]
 
