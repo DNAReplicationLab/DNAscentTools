@@ -224,7 +224,7 @@ def convert_dnascent_detect_to_modBAM_file(detectStream, filename,
 
             # set modification positions and values
             # ChEBI code for BrdU is 472552
-            seg.set_tag("Mm", f"T+{code},{strGapsInT}" , "Z")
+            seg.set_tag("Mm", f"T+{code},{strGapsInT};" , "Z")
             seg.set_tag("Ml", list(fnRevIfNeeded(probFrm0To255)))
 
             # store modBAM entry

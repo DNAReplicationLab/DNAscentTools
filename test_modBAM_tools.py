@@ -25,12 +25,12 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             "13\t0.039008\tTTCTGT\n"
             "14\t0.031474\tTCTGTG\n"
             "16\t0.026997\tTGTGAG\n"
-            ">a4f36092-b4d5-47a9-813e-c22c3b477a0c dummyIII 273 321 fwd\n"
-            "276\t0.866907\tTCAAAT\n"
-            "281\t0.947935\tTCCACA\n"
-            "300\t0.014683\tTGGGAG\n"
-            "312\t0.186812\tTAACGG\n"
-            "320\t0.934850\tTTATTG\n"
+            ">a4f36092-b4d5-47a9-813e-c22c3b477a0c dummyIII 23 71 fwd\n"
+            "26\t0.866907\tTCAAAT\n"
+            "31\t0.947935\tTCCACA\n"
+            "50\t0.014683\tTGGGAG\n"
+            "62\t0.186812\tTAACGG\n"
+            "70\t0.934850\tTTATTG\n"
             ">c6785e1f-10d2-49cb-8ca3-e8d48979001b dummyII 3 36 rev\n"
             "10\t0.012874\tTCTCTA\n"
             "11\t0.012428\tCTCTAA\n"
@@ -39,18 +39,20 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             "18\t0.013836\tGACCAA\n"
             )
 
+        cls.seq1 = "AGCTAGCTATCGTTTCTGTGAG"
+        cls.seq2 = "AGCTAGCTAGTCTCTAACGACCAA"
+        cls.seq3 = (
+            "CCACACCACACCCACACACCCACACATCAAATCCACACCACACCACACCC"
+            "TGGGAGCCACCATAACGGCCTTATTG"
+            )
+
         cls.fakeFaFile = (">dummyI\n"
-            "AGCTAGCTATCGTTTCTGTGAG\n"
+            f"{cls.seq1}\n"
             ">dummyII\n"
-            "AGCTAGCTAGTCTCTAACGACCAA\n"
+            f"{cls.seq2}\n"
             ">dummyIII\n"
-            "CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACC\n"
-            "CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACC\n"
-            "CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACC\n"
-            "CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACC\n"
-            "CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACC\n"
-            "CCACACCACACCCACACACCCACACACTCAAATCCACACCACACCACACC\n"
-            "TGGGAGCCACCATAACGGCCTTATTG\n"
+            f"{cls.seq3[0:50]}\n"
+            f"{cls.seq3[50:]}\n"
             )
 
     def test_get_gaps_in_base_pos(self):
@@ -88,10 +90,10 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             {
                 "readID": "a4f36092-b4d5-47a9-813e-c22c3b477a0c",
                 "refContig": "dummyIII",
-                "refStart": 273,
-                "refEnd": 321,
+                "refStart": 23,
+                "refEnd": 71,
                 "strand": "fwd",
-                "posOnRef": [276, 281, 300, 312, 320],
+                "posOnRef": [26, 31, 50, 62, 70],
                 "probBrdU": [0.866907, 0.947935, 0.014683, 
                     0.186812, 0.934850],
                 "sixMerOnRef": ["TCAAAT", "TCCACA", "TGGGAG", 
