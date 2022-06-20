@@ -17,7 +17,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         """
         
         cls.fakeDetect = ("# dummy data adapted from dnascent docs\n"
-            "#Genome dummy.fasta\n"
+            "#Genome dummy.fa\n"
             "#Index dummy.index\n"
             ">5d10eb9a-aae1-4db8-8ec6-7ebb34d32575 dummyI 9 17 fwd\n"
             "9\t0.017496\tTCGTTT\n"
@@ -70,10 +70,10 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             {
                 "comments": [
                     "# dummy data adapted from dnascent docs",
-                    "#Genome dummy.fasta",
+                    "#Genome dummy.fa",
                     "#Index dummy.index"
                 ],
-                "refFasta": "dummy.fasta"
+                "refFasta": "dummy.fa"
             },
             {
                 "readID": "5d10eb9a-aae1-4db8-8ec6-7ebb34d32575",
