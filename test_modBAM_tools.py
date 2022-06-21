@@ -1,13 +1,18 @@
 import unittest
+import os
+import pysam
+import itertools
 from modBAM_tools import get_gaps_in_base_pos,\
         convert_detect_into_detect_stream, \
-            convert_data_per_T_to_modBAM_fmt
+        convert_data_per_T_to_modBAM_fmt, \
+        convert_dnascent_detect_to_modBAM_file, \
+        get_mod_counts_per_interval
 
 class TestDetectToModBAMSuite(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """ Make a fake detect file
+        """ Make fake detect and fasta data
 
         Args:
             None
@@ -54,6 +59,12 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             f"{cls.seq3[0:50]}\n"
             f"{cls.seq3[50:]}\n"
             )
+
+        # make fake fasta file and index it
+        with open("dummy.fa", "w") as dummyFa:
+            dummyFa.write(cls.fakeFaFile)
+
+        pysam.faidx("dummy.fa")
 
     def test_get_gaps_in_base_pos(self):
         """ Test if finding gaps in T works """
@@ -131,6 +142,52 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             )
 
         self.assertEqual(expectedOp, op)
+
+    def test_modBAM_making(self):
+        """ Test that modBAM making works """
+
+        # make modBAM file
+        convert_dnascent_detect_to_modBAM_file(
+            convert_detect_into_detect_stream(self.fakeDetect.split("\n")), 
+            'dummy.bam', 'T', 
+            True,
+            pgInfo = {
+                'ID': 'convert_detect_to_modBAM',
+                'PN': 'convert_detect_to_modBAM',
+                'VN': 'dummy'
+            })
+
+        # index file
+        pysam.index("dummy.bam")
+
+        # get mod counts
+        t = get_mod_counts_per_interval('dummy.bam', 
+                    [('dummyIII', 26, 30),
+                     ('dummyIII', 31, 35),
+                     ('dummyIII', 26, 35)], 
+                    'T', 'T', 0.5, 0.5)
+
+        # check we picked up only modified bases in fwd strand
+        self.assertEqual([[0,0,0],[0,0,0],[0,0,0],[1,1,2]],
+            list(list(k) for k in t) )
+
+        # with high thresholds, we revert to unmodified
+        t = get_mod_counts_per_interval('dummy.bam', 
+                    [('dummyIII', 26, 30),
+                     ('dummyIII', 31, 35),
+                     ('dummyIII', 26, 35)], 
+                    'T', 'T', 0.99, 0.99)
+
+        self.assertEqual([[0,0,0],[1,1,2],[0,0,0],[0,0,0]],
+            list(list(k) for k in t) )
+
+    @classmethod
+    def tearDownClass(cls):
+        """ Delete temporary files """
+        os.system("rm dummy.bam")
+        os.system("rm dummy.bam.bai")
+        os.system("rm dummy.fa")
+        os.system("rm dummy.fa.fai")
 
 if __name__ == '__main__':
     unittest.main()

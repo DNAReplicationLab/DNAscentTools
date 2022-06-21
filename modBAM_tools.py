@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 import pysam
+from modbampy import ModBam
 
 def get_gaps_in_base_pos(posn, seq, base):
     """ Count occurences of base in seq in open interval (posn_i, posn_{i+1})
@@ -231,3 +232,40 @@ def convert_dnascent_detect_to_modBAM_file(detectStream, filename,
             fb.write(seg)
 
     refFastaFile.close()
+
+def get_mod_counts_per_interval(modBamFile, intervals, base, 
+    modCode, lowThres, highThres):
+    """ Get modification counts given reference-coordinate intervals
+
+    Args:
+        modBamFile (str): path to modBAM file
+        intervals (iter): each entry has 3 elements = contig,start,end
+        base (str): 'A', 'G', 'C' or 'T'
+        modCode (str): modification code
+        lowThres (float): probability below which base marked as unmodified
+        highThres (float): probability above which base marked as modified
+
+    Returns:
+        Tuple of 4 iterators: unmodCountInRevStrand, unmodCountInFwdStrand, 
+            modCountInRevStrand, modCountInFwdStrand
+    """
+
+    baseToNum = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
+    baseNum = baseToNum[base]
+
+    with ModBam(modBamFile) as bam:
+        # get position and counts of bases in each interval
+        t1 = list(map(lambda k: 
+                         bam.pileup(
+                             k[0], k[1], k[2],
+                             low_threshold = lowThres, 
+                             high_threshold = highThres,
+                             mod_base = modCode), 
+                     intervals))
+
+        # prepare to sum up the counts in each interval
+        f = lambda indx: map(lambda k: 
+                                int(sum(entry[indx] for entry in k[1])), t1)
+        
+        # return values
+        return f(baseNum), f(baseNum + 4), f(10), f(11)
