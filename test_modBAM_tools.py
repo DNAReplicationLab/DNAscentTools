@@ -2,6 +2,7 @@ import unittest
 import os
 import pysam
 import itertools
+from modbampy import ModBam
 from modBAM_tools import get_gaps_in_base_pos,\
         convert_detect_into_detect_stream, \
         convert_data_per_T_to_modBAM_fmt, \
@@ -36,16 +37,16 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             "50\t0.014683\tTGGGAG\n"
             "62\t0.186812\tTAACGG\n"
             "70\t0.934850\tTTATTG\n"
-            ">c6785e1f-10d2-49cb-8ca3-e8d48979001b dummyII 3 36 rev\n"
+            ">fffffff1-10d2-49cb-8ca3-e8d48979001b dummyII 3 36 rev\n"
             "10\t0.012874\tTCTCTA\n"
             "11\t0.012428\tCTCTAA\n"
             "14\t0.016811\tTAACGA\n"
             "17\t0.013372\tCGACCA\n"
-            "18\t0.013836\tGACCAA\n"
+            "18\t0.713836\tGACCAA\n"
             )
 
         cls.seq1 = "AGCTAGCTATCGTTTCTGTGAG"
-        cls.seq2 = "AGCTAGCTAGTCTCTAACGACCAA"
+        cls.seq2 = "GGGGGGGGGGTCTCTAACGACCAA"
         cls.seq3 = (
             "CCACACCACACCCACACACCCACACATCAAATCCACACCACACCACACCC"
             "TGGGAGCCACCATAACGGCCTTATTG"
@@ -111,14 +112,14 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                     "TAACGG", "TTATTG"]
             },
             {
-                "readID": "c6785e1f-10d2-49cb-8ca3-e8d48979001b",
+                "readID": "fffffff1-10d2-49cb-8ca3-e8d48979001b",
                 "refContig": "dummyII",
                 "refStart": 3,
                 "refEnd": 36,
                 "strand": "rev",
                 "posOnRef": [10, 11, 14, 17, 18],
                 "probBrdU": [0.012874, 0.012428, 0.016811, 
-                    0.013372, 0.013836],
+                    0.013372, 0.713836],
                 "sixMerOnRef": ["TCTCTA", "CTCTAA", "TAACGA", 
                     "CGACCA", "GACCAA"]
             }
@@ -181,6 +182,34 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         self.assertEqual([[0,0,0],[1,1,2],[0,0,0],[0,0,0]],
             list(list(k) for k in t) )
 
+        # test that individual sites look ok
+        # note: fffffff, the first 7 letters of read id, become
+        # 16 ** 7 - 1 when converted to decimal
+
+        with ModBam("dummy.bam") as bam:
+            siteData = [
+                (   
+                    l.rpos, l.qpos, l.qual,
+                    l.query_name, l.strand, l.mstrand, l.cbase, l.mbase
+                ) for k in 
+                    bam.reads(
+                        'dummyII', 3, 36, tag_name = 'XR', 
+                        tag_value = 16 ** 7 - 1
+                        ) 
+                for l in k.mod_sites]
+
+            siteTuple = ("fffffff1-10d2-49cb-8ca3-e8d48979001b",
+                '-', 0, 'T', 'T')
+            
+            self.assertEqual(siteData,
+                [
+                    (15, 12, 3, *siteTuple),
+                    (16, 13, 3, *siteTuple),
+                    (19, 16, 4, *siteTuple),
+                    (22, 19, 3, *siteTuple),
+                    (23, 20, 182, *siteTuple),
+                ])
+            
     @classmethod
     def tearDownClass(cls):
         """ Delete temporary files """

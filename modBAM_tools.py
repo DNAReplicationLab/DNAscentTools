@@ -185,6 +185,12 @@ def convert_dnascent_detect_to_modBAM_file(detectStream, filename,
             fwdStrand = oneDetect['strand'] == 'fwd'
             fnRevIfNeeded = lambda x: x if fwdStrand else reversed(x)
 
+            # reconstruct detect header but with underscores
+            detectHeader = "_".join(
+                str(oneDetect[k]) for k in 
+                    ['readID','refContig','refStart','refEnd','strand']
+                )
+
             # get sequence from reference
             seq = refFastaFile.fetch(oneDetect['refContig'],
                 oneDetect['refStart'], 
@@ -223,10 +229,15 @@ def convert_dnascent_detect_to_modBAM_file(detectStream, filename,
 
             strGapsInT = ",".join(str(int(k)) for k in gapsInT)
 
+            # function to convert UUID to int
+            uuidFirst7CharToInt = lambda x: int(x[0:7], 16)
+
             # set modification positions and values
             # ChEBI code for BrdU is 472552
-            seg.set_tag("Mm", f"T+{code},{strGapsInT};" , "Z")
-            seg.set_tag("Ml", list(fnRevIfNeeded(probFrm0To255)))
+            seg.set_tag("MM", f"T+{code}?,{strGapsInT};" , "Z")
+            seg.set_tag("ML", list(fnRevIfNeeded(probFrm0To255)))
+            seg.set_tag("XR", uuidFirst7CharToInt(oneDetect['readID']), "i")
+            seg.set_tag("XA", f"{detectHeader}" , "Z")
 
             # store modBAM entry
             fb.write(seg)
