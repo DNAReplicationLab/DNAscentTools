@@ -7,7 +7,8 @@ from modBAM_tools import get_gaps_in_base_pos,\
         convert_detect_into_detect_stream, \
         convert_data_per_T_to_modBAM_fmt, \
         convert_dnascent_detect_to_modBAM_file, \
-        get_mod_counts_per_interval
+        get_mod_counts_per_interval, \
+            get_read_data
 
 class TestDetectToModBAMSuite(unittest.TestCase):
 
@@ -209,6 +210,40 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                     (22, 19, 3, *siteTuple),
                     (23, 20, 182, *siteTuple),
                 ])
+
+    def test_modBAM_retrieval(self):
+        """ Test retrieval of data from modbam file """
+
+        # test getting read data
+        for detectRecord in filter(lambda x: 'readID' in x, 
+                                    convert_detect_into_detect_stream(
+                                        self.fakeDetect.split("\n")
+                                    )):
+            
+            # expected positions and probabilities
+            expectedOp = zip(detectRecord["posOnRef"],
+                detectRecord["probBrdU"])
+
+            # get read data and compare to expectation
+            for k in zip(expectedOp,
+                get_read_data(
+                    "dummy.bam", 
+                    detectRecord["readID"],
+                    detectRecord["refContig"],
+                    detectRecord["refStart"],
+                    detectRecord["refEnd"],
+                    )
+                ):
+
+                # if reverse strand, increment dnascent indx by 5
+                if detectRecord["strand"] == "rev":
+                    self.assertEqual(k[0][0] + 5, k[1][0])
+                else:
+                    self.assertEqual(k[0][0],k[1][0])
+
+                # in going to modBAM, resolution takes a hit, so
+                # we can only ascertain equality within 1/256ths
+                self.assertAlmostEqual(k[0][1],k[1][1],delta = 1/256)
             
     @classmethod
     def tearDownClass(cls):
