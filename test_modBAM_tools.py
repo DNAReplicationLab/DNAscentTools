@@ -8,7 +8,7 @@ from modBAM_tools import get_gaps_in_base_pos,\
         convert_data_per_T_to_modBAM_fmt, \
         convert_dnascent_detect_to_modBAM_file, \
         get_mod_counts_per_interval, \
-            get_read_data
+            get_read_data_from_modBAM
 
 class TestDetectToModBAMSuite(unittest.TestCase):
 
@@ -226,7 +226,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
 
             # get read data and compare to expectation
             for k in zip(expectedOp,
-                get_read_data(
+                get_read_data_from_modBAM(
                     "dummy.bam", 
                     detectRecord["readID"],
                     detectRecord["refContig"],

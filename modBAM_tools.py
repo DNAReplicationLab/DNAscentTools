@@ -281,7 +281,7 @@ def get_mod_counts_per_interval(modBamFile, intervals, base,
         # return values
         return f(baseNum), f(baseNum + 4), f(10), f(11)
 
-def get_read_data(modBamFile, readID, contig, start, end):
+def get_read_data_from_modBAM(modBamFile, readID, contig, start, end):
     """ Get modification probabilities corresponding to coords on a read
 
     Args:
