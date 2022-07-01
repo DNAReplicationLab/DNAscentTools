@@ -219,7 +219,7 @@ def convert_dnascent_detect_to_modBAM_file(detectStream, filename,
                 relPos = [k - oneDetect['refStart'] for k in 
                             oneDetect['posOnRef']]
             else:
-                relPos = [oneDetect['refEnd'] - (k + shftRevStrndPos) 
+                relPos = [oneDetect['refEnd'] - 1 - (k + shftRevStrndPos) 
                             for k in reversed(oneDetect['posOnRef'])]
 
             Tcoords = list(itertools.chain([-1], relPos))

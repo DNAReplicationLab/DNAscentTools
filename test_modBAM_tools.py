@@ -22,44 +22,54 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         Returns:
             None
         """
-        
-        cls.fakeDetect = ("# dummy data adapted from dnascent docs\n"
-            "#Genome dummy.fa\n"
-            "#Index dummy.index\n"
-            ">5d10eb9a-aae1-4db8-8ec6-7ebb34d32575 dummyI 9 17 fwd\n"
-            "9\t0.017496\tTCGTTT\n"
-            "12\t0.029483\tTTTCTG\n"
-            "13\t0.039008\tTTCTGT\n"
-            "14\t0.031474\tTCTGTG\n"
-            "16\t0.026997\tTGTGAG\n"
-            ">a4f36092-b4d5-47a9-813e-c22c3b477a0c dummyIII 23 71 fwd\n"
-            "26\t0.866907\tTCAAAT\n"
-            "31\t0.947935\tTCCACA\n"
-            "50\t0.014683\tTGGGAG\n"
-            "62\t0.186812\tTAACGG\n"
-            "70\t0.934850\tTTATTG\n"
-            ">fffffff1-10d2-49cb-8ca3-e8d48979001b dummyII 3 36 rev\n"
-            "10\t0.012874\tTCTCTA\n"
-            "11\t0.012428\tCTCTAA\n"
-            "14\t0.016811\tTAACGA\n"
-            "17\t0.013372\tCGACCA\n"
-            "18\t0.713836\tGACCAA\n"
-            )
 
-        cls.seq1 = "AGCTAGCTATCGTTTCTGTGAG"
-        cls.seq2 = "GGGGGGGGGGTCTCTAACGACCAA"
-        cls.seq3 = (
+        cls.comments = [
+            "# dummy data adapted from dnascent docs",
+            "#Genome dummy.fa",
+            "#Index dummy.index"
+        ]
+
+        cls.seqContig1 = "AGCTAGCTATCGTTTCTGTGAG"
+        cls.seqContig2 = "GGGGGGGGGGTCTCTAACGACCAAGGGGGGGGGGGGGGGGGGGGGGGG"
+        cls.seqContig3 = (
             "CCACACCACACCCACACACCCACACATCAAATCCACACCACACCACACCC"
             "TGGGAGCCACCATAACGGCCTTATTG"
             )
+        
+        cls.fakeDetect = (f"{cls.comments[0]}\n"
+            f"{cls.comments[1]}\n"
+            f"{cls.comments[2]}\n"
+            ">5d10eb9a-aae1-4db8-8ec6-7ebb34d32575 dummyI 9 17 fwd\n"
+            f"9\t0.017496\t{cls.seqContig1[9:15]}\n"
+            f"12\t0.029483\t{cls.seqContig1[12:18]}\n"
+            f"13\t0.039008\t{cls.seqContig1[13:19]}\n"
+            f"14\t0.031474\t{cls.seqContig1[14:20]}\n"
+            f"16\t0.026997\t{cls.seqContig1[16:22]}\n"
+            ">a4f36092-b4d5-47a9-813e-c22c3b477a0c dummyIII 23 71 fwd\n"
+            f"26\t0.866907\t{cls.seqContig3[26:32]}\n"
+            f"31\t0.947935\t{cls.seqContig3[31:37]}\n"
+            f"50\t0.014683\t{cls.seqContig3[50:56]}\n"
+            f"62\t0.186812\t{cls.seqContig3[62:68]}\n"
+            f"70\t0.934850\t{cls.seqContig3[70:76]}\n"
+            ">fffffff1-10d2-49cb-8ca3-e8d48979001b dummyII 3 36 rev\n"
+            f"10\t0.012874\t{cls.seqContig2[10:16]}\n"
+            f"11\t0.012428\t{cls.seqContig2[11:17]}\n"
+            f"14\t0.016811\t{cls.seqContig2[14:20]}\n"
+            f"17\t0.013372\t{cls.seqContig2[17:23]}\n"
+            f"18\t0.713836\t{cls.seqContig2[18:24]}\n"
+            )
+
+        cls.query1 = cls.seqContig1[9: 17]
+        cls.query2 = cls.seqContig2[3: 36]
+        cls.query3 = cls.seqContig3[23: 71]
 
         cls.fakeFaFile = (">dummyI\n"
-            f"{cls.seq1}\n"
+            f"{cls.seqContig1}\n"
             ">dummyII\n"
-            f"{cls.seq2}\n"
+            f"{cls.seqContig2}\n"
             ">dummyIII\n"
-            f"{cls.seq3[0:50]}\n"
-            f"{cls.seq3[50:]}\n"
+            f"{cls.seqContig3[0:50]}\n"
+            f"{cls.seqContig3[50:]}\n"
             )
 
         # make fake fasta file and index it
@@ -67,6 +77,24 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             dummyFa.write(cls.fakeFaFile)
 
         pysam.faidx("dummy.fa")
+
+        # program info
+        cls.pgInfo = {
+                'PN': 'convert_detect_to_modBAM',
+                'ID': 'convert_detect_to_modBAM',
+                'VN': 'dummyVersion'
+            }
+
+        # make modBAM file
+        convert_dnascent_detect_to_modBAM_file(
+            convert_detect_into_detect_stream(cls.fakeDetect.split("\n")), 
+            'dummy.bam', 'T', 
+            True,
+            pgInfo = cls.pgInfo)
+
+        # index file
+        pysam.index("dummy.bam")
+
 
     def test_get_gaps_in_base_pos(self):
         """ Test if finding gaps in T works """
@@ -145,22 +173,8 @@ class TestDetectToModBAMSuite(unittest.TestCase):
 
         self.assertEqual(expectedOp, op)
 
-    def test_modBAM_making(self):
-        """ Test that modBAM making works """
-
-        # make modBAM file
-        convert_dnascent_detect_to_modBAM_file(
-            convert_detect_into_detect_stream(self.fakeDetect.split("\n")), 
-            'dummy.bam', 'T', 
-            True,
-            pgInfo = {
-                'ID': 'convert_detect_to_modBAM',
-                'PN': 'convert_detect_to_modBAM',
-                'VN': 'dummy'
-            })
-
-        # index file
-        pysam.index("dummy.bam")
+    def test_modBAM_retrieval_1(self):
+        """ Test that modBAM retrieval works """
 
         # get mod counts
         t = get_mod_counts_per_interval('dummy.bam', 
@@ -211,7 +225,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                     (23, 20, 182, *siteTuple),
                 ])
 
-    def test_modBAM_retrieval(self):
+    def test_modBAM_retrieval_2(self):
         """ Test retrieval of data from modbam file """
 
         # test getting read data
@@ -244,6 +258,47 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                 # in going to modBAM, resolution takes a hit, so
                 # we can only ascertain equality within 1/256ths
                 self.assertAlmostEqual(k[0][1],k[1][1],delta = 1/256)
+
+    def test_headers_modBAM(self):
+        """ Test that headers are fine in our dummy modBAM file """
+
+        # function to extract that portion of a header corresponding to a tag
+        getsHeaderGivenTag = lambda tag: \
+                [*map(
+                    lambda x: x[4:],
+                    filter(
+                        lambda x: x.startswith(f"@{tag}\t"), 
+                        headerStr.split("\n")
+                        )
+                )]
+
+        # get header
+        headerStr = pysam.view("-H", "dummy.bam")
+
+        # prepare contig and contig length portion of header and compare
+        contigs = ["dummyI", "dummyII", "dummyIII"]
+        contigLens = [len(self.seqContig1), len(self.seqContig2), 
+            len(self.seqContig3)]
+
+        contigStrList = [*map(
+            lambda x: f"SN:{x[0]}\tLN:{x[1]}",
+            zip(contigs, contigLens)
+            )]
+
+        self.assertEqual(contigStrList, getsHeaderGivenTag("SQ"))
+
+        # prepare comment portion of header and compare
+        self.assertEqual(
+            [*map(lambda x: "comment: " + x, self.comments)], 
+            getsHeaderGivenTag("CO"))
+
+        # compare program id part of header
+        pgInfoHeader = "\t".join(
+                f"{k[0]}:{k[1]}" for k in self.pgInfo.items()
+                )
+        self.assertTrue(any(map(
+            lambda x: x == pgInfoHeader,
+            getsHeaderGivenTag("PG"))))
             
     @classmethod
     def tearDownClass(cls):
