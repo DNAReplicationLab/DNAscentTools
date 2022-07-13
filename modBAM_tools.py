@@ -301,7 +301,7 @@ def get_read_data_from_modBAM(modBamFile, readID, contig, start, end):
     # find relevant records and return data
     with ModBam(modBamFile) as bam:
         siteData = filter(
-            lambda x: x[2] == readID,
+            lambda x: x[2] == readID and x[0] >= start and x[0] < end,
             ((   
                 l.rpos, l.qual,
                 l.query_name

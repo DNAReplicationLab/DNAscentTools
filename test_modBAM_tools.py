@@ -259,6 +259,31 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                 # we can only ascertain equality within 1/256ths
                 self.assertAlmostEqual(k[0][1],k[1][1],delta = 1/256)
 
+    def test_modBAM_retrieval_3(self):
+        """ More tests for retrieval of data from modBAM file """
+
+        for detectRecord in filter(lambda x: 'readID' in x, 
+                                    convert_detect_into_detect_stream(
+                                        self.fakeDetect.split("\n")
+                                    )):
+
+            cnt = 0
+
+            # get read data
+            for k in get_read_data_from_modBAM(
+                        "dummy.bam", 
+                        detectRecord["readID"],
+                        detectRecord["refContig"],
+                        detectRecord["refStart"],
+                        detectRecord["refStart"] + 1,
+                        ):
+                cnt += 1
+
+            # at most one record should have gotten through as we are querying
+            # start to start + 1
+            self.assertTrue(cnt == 0 or cnt == 1)
+        
+
     def test_headers_modBAM(self):
         """ Test that headers are fine in our dummy modBAM file """
 
