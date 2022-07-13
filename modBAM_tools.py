@@ -281,34 +281,35 @@ def get_mod_counts_per_interval(modBamFile, intervals, base,
         # return values
         return f(baseNum), f(baseNum + 4), f(10), f(11)
 
-def get_read_data_from_modBAM(modBamFile, readID, contig, start, end):
+def get_read_data_from_modBAM(mod_bam_file: str, read_id: str, 
+    contig: str, start: int, end: int):
     """ Get modification probabilities corresponding to coords on a read
 
     Args:
-        modBamFile (str): path to modBAM file
-        readID (str): requested read ID
-        contig (str): contig on reference genome
-        start (num): start posn on ref genome, 0-based
-        end (num): end posn on ref genome, 0-based
+        mod_bam_file: path to modBAM file
+        read_id: requested read ID
+        contig: contig on reference genome
+        start: start posn on ref genome, 0-based
+        end: end posn on ref genome, 0-based
 
     Returns:
         Iterator w each entry = (ref posn, probability)
     """
 
     # function to convert UUID to int
-    uuidFirst7CharToInt = lambda x: int(x[0:7], 16)
+    uuid_first_7_char_to_int = lambda x: int(x[0:7], 16)
 
     # find relevant records and return data
-    with ModBam(modBamFile) as bam:
-        siteData = filter(
-            lambda x: x[2] == readID and x[0] >= start and x[0] < end,
+    with ModBam(mod_bam_file) as bam:
+        site_data = filter(
+            lambda x: x[2] == read_id and x[0] >= start and x[0] < end,
             ((   
                 l.rpos, l.qual,
                 l.query_name
             ) for k in 
                 bam.reads(
                     contig, start, end, tag_name = 'XR', 
-                    tag_value = uuidFirst7CharToInt(readID)
+                    tag_value = uuid_first_7_char_to_int(read_id)
                     ) 
             for l in k.mod_sites))
 
@@ -317,4 +318,4 @@ def get_read_data_from_modBAM(modBamFile, readID, contig, start, end):
         #   probability lies b/w i/256 and (i+1)/256 and i
         #   is a number b/w 0 and 255. So we return the midpoint
         #   of the interval given an i.
-        return map(lambda x: (x[0], (x[1] + x[1] + 1)/(256*2)), siteData)
+        return map(lambda x: (x[0], (x[1] + x[1] + 1)/(256*2)), site_data)
