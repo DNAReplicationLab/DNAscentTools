@@ -1,6 +1,5 @@
 import argparse
 import sys
-from io import StringIO
 from modBAM_tools import convert_dnascent_detect_to_modBAM_file, \
     convert_detect_into_detect_stream
 
@@ -25,18 +24,18 @@ if __name__ == "__main__":
     """
 
     # get options
-    parser = argparse.ArgumentParser(description = desc,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--op', type = str, required = True,
-        help = 'output modBAM file')
-    parser.add_argument('--tag', type = str, required = False, 
-        help = ('(default: 472552, which is BrdU) ChEBI code or one letter '
-                'code of base modification'),
-        default = '472552')
-    parser.add_argument('--sam', required = False, 
-        action = 'store_true',
-        help = '(optional) make a sam file instead of a bam file',
-        default = False)
+    parser = argparse.ArgumentParser(description=desc,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--op', type=str, required=True,
+                        help='output modBAM file')
+    parser.add_argument('--tag', type=str, required=False,
+                        help=('(default: 472552, which is BrdU) ChEBI code or one letter '
+                              'code of base modification'),
+                        default='472552')
+    parser.add_argument('--sam', required=False,
+                        action='store_true',
+                        help='(optional) make a sam file instead of a bam file',
+                        default=False)
 
     args = parser.parse_args()
 
@@ -55,7 +54,7 @@ if __name__ == "__main__":
 
     # make modBAM/modSAM file
     convert_dnascent_detect_to_modBAM_file(
-        convert_detect_into_detect_stream(sys.stdin), 
-        args.op, args.tag, 
+        convert_detect_into_detect_stream(sys.stdin),
+        args.op, args.tag,
         not args.sam,
-        pgInfo = pgInfo)
+        pgInfo=pgInfo)

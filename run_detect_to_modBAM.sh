@@ -13,12 +13,11 @@ modBAMPrefix=$detectFile.mod
 infoStr="#a sample comment"
 
 # perform detect to modBAM conversion.
-# NOTE: user can replace specifed tag T, which means
+# NOTE: user can replace specified tag T, which means
 # a generic thymidine modification. default tag
 # is the CheBI code of BrdU and is used when no tag
 # is specified.
-cat $detectFile |\
-    sed "1i$infoStr" |\
+sed "1i$infoStr" $detectFile |\
     python convert_detect_to_modBAM.py --op $modBAMPrefix.bam --tag T
 
 # index and sort files
