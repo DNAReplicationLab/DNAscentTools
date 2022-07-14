@@ -95,7 +95,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             convert_detect_into_detect_stream(cls.fakeDetect.split("\n")),
             'dummy.bam', 'T',
             True,
-            pgInfo=cls.pgInfo)
+            pg_info=cls.pgInfo)
 
         # index file
         pysam.index("dummy.bam")

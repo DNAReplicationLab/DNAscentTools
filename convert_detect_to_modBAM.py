@@ -57,4 +57,4 @@ if __name__ == "__main__":
         convert_detect_into_detect_stream(sys.stdin),
         args.op, args.tag,
         not args.sam,
-        pgInfo=pgInfo)
+        pg_info=pgInfo)
