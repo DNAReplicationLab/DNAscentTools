@@ -48,7 +48,6 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                           f"9\t0.017496\t{cls.seqContig1[9:15]}\n"
                           f"12\t0.029483\t{cls.seqContig1[12:18]}\n"
                           f"13\t0.039008\t{cls.seqContig1[13:19]}\n"
-                          f"14\t0.031474\t{cls.seqContig1[14:20]}\n"
                           f"16\t0.026997\t{cls.seqContig1[16:22]}\n"
                           ">a4f36092-b4d5-47a9-813e-c22c3b477a0c dummyIII 23 71 fwd\n"
                           f"26\t0.866907\t{cls.seqContig3[26:32]}\n"
@@ -126,11 +125,11 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                 "refStart": 9,
                 "refEnd": 17,
                 "strand": "fwd",
-                "posOnRef": [9, 12, 13, 14, 16],
+                "posOnRef": [9, 12, 13, 16],
                 "probBrdU": [0.017496, 0.029483, 0.039008,
-                             0.031474, 0.026997],
+                             0.026997],
                 "sixMerOnRef": ["TCGTTT", "TTTCTG", "TTCTGT",
-                                "TCTGTG", "TGTGAG"]
+                                "TGTGAG"]
             },
             {
                 "readID": "a4f36092-b4d5-47a9-813e-c22c3b477a0c",
