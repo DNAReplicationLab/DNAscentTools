@@ -177,10 +177,10 @@ class TestDetectToModBAMSuite(unittest.TestCase):
     def test_convert_data_per_T_to_modBAM_str(self):
         """ Test converting data to modBAM strings """
 
-        expected_op = [128, 129]
+        expected_op = [128, 129, 0, 255]
 
         op = convert_data_per_T_to_modBAM_fmt(
-            [0.5, 0.5 + 1 / 256]
+            [0.5, 0.5 + 1 / 256, 0, 0.9999999]
         )
 
         self.assertEqual(expected_op, op)

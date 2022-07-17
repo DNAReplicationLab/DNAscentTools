@@ -214,6 +214,10 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
                                        oneDetect['refStart'],
                                        oneDetect['refEnd'])
 
+            # check that length of retrieved sequence and DNAscent header match
+            if not len(seq) == oneDetect['refEnd'] - oneDetect['refStart']:
+                raise ValueError("Problems in retrieved sequence length")
+
             # create modBAM entry
             seg = pysam.AlignedSegment()
             seg.query_name = oneDetect['readID']
