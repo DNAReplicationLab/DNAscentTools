@@ -8,13 +8,25 @@ def get_gaps_in_base_pos(pos, seq, base):
     """ Count occurrences of base in seq in open interval (pos_i, pos_{i+1})
 
     Args:
-        pos (list of int): Positions of interest, entries >= 0 & < len(seq)
+        pos (list of int): Positions of interest, in ascending order, no duplicates, and entries >= -1 & <= len(seq)
         seq (str): Sequence of interest
         base (str): one-character string
 
     Returns:
         list of ints with length 1 shy of length of pos.
     """
+    # raise error if first and last entries are inappropriate
+    if pos[0] < -1 or pos[-1] > len(seq):
+        raise ValueError("Inappropriate entries")
+
+    # check pos is in ascending order
+    if any(pos[k] - pos[k - 1] <= 0 for k in range(1, len(pos))):
+        raise ValueError("Positions must be in ascending order")
+
+    # raise error if any entry of seq has a different base at pos
+    if not all(seq[m] == base for m in filter(lambda x: -1 <= x <= len(seq), pos)):
+        raise ValueError(f'Positions of interest must be {base}')
+
     return [seq[k[0] + 1: k[1]].count(base) for k in
             zip(pos[:-1], pos[1:])]
 
