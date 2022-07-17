@@ -11,7 +11,6 @@ from modBAM_tools import get_gaps_in_base_pos, \
 
 
 class TestDetectToModBAMSuite(unittest.TestCase):
-
     pgInfo = None
     fakeDetect = None
     fakeFaFile = None
@@ -105,17 +104,17 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         self.assertEqual([1], get_gaps_in_base_pos([1, 5], 'ATATATA', 'T'))
         self.assertEqual([2], get_gaps_in_base_pos([1, 5], 'ATTTATA', 'T'))
         self.assertEqual([1, 0, 0, 1, 1], get_gaps_in_base_pos([-1, 1, 5, 9, 14, 17],
-                                                         'GGXXXGXXXGXXGXGXG', 'G'))
+                                                               'GGXXXGXXXGXXGXGXG', 'G'))
 
         # are erroneous inputs caught?
-        self.assertRaises(ValueError, get_gaps_in_base_pos,[1, 5, 9, 14],
-                                                         'XTXXXGXXXGXXGXGXG', 'G')
-        self.assertRaises(ValueError, get_gaps_in_base_pos,[1, 5, 9, 18],
-                                                         'XGXXXGXXXGXXGXGXG', 'G')
-        self.assertRaises(ValueError, get_gaps_in_base_pos,[-2, 5, 9, 14],
-                                                         'XGXXXGXXXGXXGXGXG', 'G')
-        self.assertRaises(ValueError, get_gaps_in_base_pos,[5, 1, 9, 14],
-                                                         'XGXXXGXXXGXXGXGXG', 'G')
+        self.assertRaises(ValueError, get_gaps_in_base_pos, [1, 5, 9, 14],
+                          'XTXXXGXXXGXXGXGXG', 'G')
+        self.assertRaises(ValueError, get_gaps_in_base_pos, [1, 5, 9, 18],
+                          'XGXXXGXXXGXXGXGXG', 'G')
+        self.assertRaises(ValueError, get_gaps_in_base_pos, [-2, 5, 9, 14],
+                          'XGXXXGXXXGXXGXGXG', 'G')
+        self.assertRaises(ValueError, get_gaps_in_base_pos, [5, 1, 9, 14],
+                          'XGXXXGXXXGXXGXGXG', 'G')
 
     def test_convert_detect_into_detect_stream(self):
         """ Test if iterating over detect records works """
