@@ -24,7 +24,7 @@ def get_gaps_in_base_pos(pos, seq, base):
         raise ValueError("Positions must be in ascending order")
 
     # raise error if any entry of seq has a different base at pos
-    if not all(seq[m] == base for m in filter(lambda x: -1 <= x <= len(seq), pos)):
+    if not all(seq[m] == base for m in filter(lambda x: -1 < x < len(seq), pos)):
         raise ValueError(f'Positions of interest must be {base}')
 
     return [seq[k[0] + 1: k[1]].count(base) for k in
