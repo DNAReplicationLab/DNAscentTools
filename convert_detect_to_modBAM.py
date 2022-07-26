@@ -49,7 +49,7 @@ if __name__ == "__main__":
     pgInfo = {
         'ID': 'convert_detect_to_modBAM',
         'PN': 'convert_detect_to_modBAM',
-        'VN': 'gamma'
+        'VN': 'v0.1'
     }
 
     # make modBAM/modSAM file
