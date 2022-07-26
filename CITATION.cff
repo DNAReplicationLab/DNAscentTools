@@ -1,0 +1,22 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: DNAscentTools
+message: >-
+  If you use the software, please cite the
+  peer-reviewed, published paper or a preprint,
+  whichever is later, if/when it appears. Till then,
+  please cite the software using these metadata.
+type: software
+authors:
+  - given-names: Sathish
+    family-names: Thiyagarajan
+    email: mailboxofsat@gmail.com
+    affiliation: Earlham Institute
+    orcid: 'https://orcid.org/0000-0001-8545-8886'
+  - orcid: 'https://orcid.org/0000-0003-2001-076X'
+    affiliation: Earlham Institute
+    email: Conrad.Nieduszynski@earlham.ac.uk
+    given-names: Conrad
+    family-names: Nieduszynski
