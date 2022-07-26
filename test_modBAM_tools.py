@@ -29,7 +29,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
 
         cls.comments = [
             "# dummy data adapted from dnascent docs",
-            "#Genome dummy.fa",
+            "#Genome sample.fa",
             "#Index dummy.index"
         ]
 
@@ -76,10 +76,10 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                           )
 
         # make fake fasta file and index it
-        with open("dummy.fa", "w") as dummyFa:
+        with open("sample.fa", "w") as dummyFa:
             dummyFa.write(cls.fakeFaFile)
 
-        pysam.faidx("dummy.fa")
+        pysam.faidx("sample.fa")
 
         # program info
         cls.pgInfo = {
@@ -91,12 +91,19 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         # make modBAM file
         convert_dnascent_detect_to_modBAM_file(
             convert_detect_into_detect_stream(cls.fakeDetect.split("\n")),
-            'dummy.bam', 'T',
+            'sample.bam', 'T',
             True,
             pg_info=cls.pgInfo)
 
+        # make modSAM file
+        convert_dnascent_detect_to_modBAM_file(
+            convert_detect_into_detect_stream(cls.fakeDetect.split("\n")),
+            'sample.sam', 'T',
+            False,
+            pg_info=cls.pgInfo)
+
         # index file
-        pysam.index("dummy.bam")
+        pysam.index("sample.bam")
 
     def test_get_gaps_in_base_pos(self):
         """ Test if finding gaps in T works """
@@ -123,10 +130,10 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             {
                 "comments": [
                     "# dummy data adapted from dnascent docs",
-                    "#Genome dummy.fa",
+                    "#Genome sample.fa",
                     "#Index dummy.index"
                 ],
-                "refFasta": "dummy.fa"
+                "refFasta": "sample.fa"
             },
             {
                 "readID": "5d10eb9a-aae1-4db8-8ec6-7ebb34d32575",
@@ -189,7 +196,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         """ Test that modBAM retrieval works """
 
         # get mod counts
-        t = get_mod_counts_per_interval('dummy.bam',
+        t = get_mod_counts_per_interval('sample.bam',
                                         [('dummyIII', 26, 30),
                                          ('dummyIII', 31, 35),
                                          ('dummyIII', 26, 35)],
@@ -200,7 +207,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                          list(list(k) for k in t))
 
         # with high thresholds, we revert to unmodified
-        t = get_mod_counts_per_interval('dummy.bam',
+        t = get_mod_counts_per_interval('sample.bam',
                                         [('dummyIII', 26, 30),
                                          ('dummyIII', 31, 35),
                                          ('dummyIII', 26, 35)],
@@ -213,7 +220,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         # note: fffffff, the first 7 letters of read id, become
         # 16 ** 7 - 1 when converted to decimal
 
-        with ModBam("dummy.bam") as bam:
+        with ModBam("sample.bam") as bam:
             site_data = [
                 (
                     p.rpos, p.qpos, p.qual,
@@ -253,7 +260,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             # get read data and compare to expectation
             for k in zip(expected_op,
                          get_read_data_from_modBAM(
-                             "dummy.bam",
+                             "sample.bam",
                              detectRecord["readID"],
                              detectRecord["refContig"],
                              detectRecord["refStart"],
@@ -283,7 +290,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
 
             # get read data
             for _ in get_read_data_from_modBAM(
-                    "dummy.bam",
+                    "sample.bam",
                     detectRecord["readID"],
                     detectRecord["refContig"],
                     detectRecord["refStart"],
@@ -309,7 +316,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             )]
 
         # get header
-        header_str = pysam.view("-H", "dummy.bam")
+        header_str = pysam.view("-H", "sample.bam")
 
         # prepare contig and contig length portion of header and compare
         contigs = ["dummyI", "dummyII", "dummyIII"]
@@ -338,11 +345,9 @@ class TestDetectToModBAMSuite(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        """ Delete temporary files """
-        os.system("rm dummy.bam")
-        os.system("rm dummy.bam.bai")
-        os.system("rm dummy.fa")
-        os.system("rm dummy.fa.fai")
+        """ Delete some temporary files """
+        os.system("rm sample.bam.bai")
+        os.system("rm sample.fa.fai")
 
 
 if __name__ == '__main__':
