@@ -144,6 +144,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                 "posOnRef": [9, 12, 13, 16],
                 "probBrdU": [0.017496, 0.029483, 0.039008,
                              0.026997],
+                "probEdU": [],
                 "sixMerOnRef": ["TCGTTT", "TTTCTG", "TTCTGT",
                                 "TGTGAG"]
             },
@@ -156,6 +157,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                 "posOnRef": [26, 31, 50, 62, 70],
                 "probBrdU": [0.866907, 0.947935, 0.014683,
                              0.186812, 0.934850],
+                "probEdU": [],
                 "sixMerOnRef": ["TCAAAT", "TCCACA", "TGGGAG",
                                 "TAACGG", "TTATTG"]
             },
@@ -168,6 +170,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                 "posOnRef": [10, 11, 14, 17, 18],
                 "probBrdU": [0.012874, 0.012428, 0.016811,
                              0.013372, 0.713836],
+                "probEdU": [],
                 "sixMerOnRef": ["TCTCTA", "CTCTAA", "TAACGA",
                                 "CGACCA", "GACCAA"]
             }
