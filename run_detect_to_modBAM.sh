@@ -20,6 +20,11 @@ infoStr="#a sample comment"
 sed "1i$infoStr" $detectFile |\
     python convert_detect_to_modBAM.py --op $modBAMPrefix.bam --tag T
 
+# if using the two-analogue version of DNAscent, use code_1+code_2
+# where code_1 and code_2 correspond to the second and third column
+# of the detect file respectively. For e.g.:
+# python convert_detect_to_modBAM.py --op $modBAMPrefix.bam --tag g+e
+
 # index and sort files
 samtools sort -o $modBAMPrefix.sorted.bam $modBAMPrefix.bam
 samtools index $modBAMPrefix.sorted.bam
