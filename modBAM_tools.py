@@ -49,7 +49,7 @@ def convert_data_per_T_to_modBAM_fmt(seq_data):
             np.clip(np.floor([r * 256 for r in seq_data]), 0, 255)]
 
 
-def convert_detect_into_detect_stream(detect_obj):
+def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
     """ Creates iterator that goes one detect record at a time. First item
     is a dictionary with keys comments and refFasta.
 
@@ -57,6 +57,7 @@ def convert_detect_into_detect_stream(detect_obj):
 
     Args:
         detect_obj (iterable): each line of detect file
+        switch_2_and_3 (bool): (default False) switch columns 2 and 3
 
     Yields:
         dict with keys readID, refContig, refStart, refEnd, strand,
@@ -65,6 +66,7 @@ def convert_detect_into_detect_stream(detect_obj):
             refFasta (str).
 
     """
+    col2, col3 = (1, 2) if not switch_2_and_3 else (2, 1)
 
     current_entry = {"comments": []}
 
@@ -117,8 +119,8 @@ def convert_detect_into_detect_stream(detect_obj):
 
                 # store data
                 current_entry['posOnRef'].append(int(split_line[0]))
-                current_entry['probBrdU'].append(float(split_line[1]))
-                current_entry['sixMerOnRef'].append(split_line[2])
+                current_entry['probBrdU'].append(float(split_line[col2]))
+                current_entry['sixMerOnRef'].append(split_line[col3])
 
             # return current record
             yield current_entry

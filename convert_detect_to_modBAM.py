@@ -36,6 +36,10 @@ if __name__ == "__main__":
                         action='store_true',
                         help='(optional) make a sam file instead of a bam file',
                         default=False)
+    parser.add_argument('--switchCols2and3', required=False,
+                        action='store_true',
+                        help='(optional) columns 3 and 2 correspond to modification probability and 6-mer respectively',
+                        default=False)
 
     args = parser.parse_args()
 
@@ -54,7 +58,7 @@ if __name__ == "__main__":
 
     # make modBAM/modSAM file
     convert_dnascent_detect_to_modBAM_file(
-        convert_detect_into_detect_stream(sys.stdin),
+        convert_detect_into_detect_stream(sys.stdin, switch_2_and_3=args.switchCols2and3),
         args.op, args.tag,
         not args.sam,
         pg_info=pgInfo)
