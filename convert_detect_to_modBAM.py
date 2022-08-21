@@ -40,6 +40,9 @@ if __name__ == "__main__":
                         action='store_true',
                         help='(optional) columns 3 and 2 correspond to modification probability and 6-mer respectively',
                         default=False)
+    parser.add_argument('--fasta', required=False,
+                        help='(default: "") use this reference genome instead of the one in the detect file',
+                        default="")
 
     args = parser.parse_args()
 
@@ -61,4 +64,5 @@ if __name__ == "__main__":
         convert_detect_into_detect_stream(sys.stdin, switch_2_and_3=args.switchCols2and3),
         args.op, args.tag,
         not args.sam,
-        pg_info=pgInfo)
+        pg_info=pgInfo,
+        fasta=args.fasta)

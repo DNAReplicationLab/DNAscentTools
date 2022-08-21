@@ -127,7 +127,8 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
 
 
 def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
-                                           code="472552", bam_file=True, shift_rev_strand_pos=5, pg_info=None):
+                                           code="472552", bam_file=True, shift_rev_strand_pos=5, pg_info=None,
+                                           fasta=""):
     """ Convert dnascent detect data to modBAM format
 
     NOTE: About dnascent reverse offset issue and the param shift_rev_strand_pos.
@@ -163,6 +164,8 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
         shift_rev_strand_pos (int): default 5. See note above, in fn docstr.
         pg_info (dict): (default None = no info). Info abt program, must
           have key 'ID'.
+        fasta (str): (default ""). If supplied, this reference genome overrides
+          reference genome in detect file
 
     Returns:
         None
@@ -176,7 +179,12 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
     ]
     }
 
-    ref_fasta_file = pysam.FastaFile(filename=init_info['refFasta'])
+    if fasta:
+        ref_fasta_file = pysam.FastaFile(filename=fasta)
+    elif 'refFasta' in init_info:
+        ref_fasta_file = pysam.FastaFile(filename=init_info['refFasta'])
+    else:
+        raise ValueError("Fasta reference genome not found!")
 
     # load names of contigs, their order, and lengths from fasta file
     ref_name_length_map = dict(zip(ref_fasta_file.references,
