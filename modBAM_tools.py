@@ -181,6 +181,14 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
 
     if fasta:
         ref_fasta_file = pysam.FastaFile(filename=fasta)
+
+        # remove existing reference genome in comments if need be and replace with new reference genome
+        for comment_line in header['CO']:
+            if comment_line.startswith('comment: #Genome'):
+                header['CO'].remove(comment_line)
+
+        header['CO'].append(f'comment: #Genome {fasta}')
+
     elif 'refFasta' in init_info:
         ref_fasta_file = pysam.FastaFile(filename=init_info['refFasta'])
     else:
