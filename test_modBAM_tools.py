@@ -343,11 +343,65 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             lambda x: x == pg_info_header,
             gets_header_given_tag("PG"))))
 
+    def test_alternate_reference_and_column_switch(self):
+        """ Test using an alternate fasta reference for detect file """
+
+        detect_file_contents = ("#Genome this_file_does_not_exist.fa\n"
+                                ">5d10eb8a-aae1-5db8-9ec6-6ebb34d32575 fake 10 20 fwd\n"
+                                "11\tAA\t0.220000\n"
+                                "13\tBB\t0.420000\n"
+                                "15\tCC\t0.620000\n"
+                                "17\tDD\t0.820000\n")
+
+        fasta_file_contents = ">fake\nCGCGCGCGCGCTGTGTGTGGGGGGG"
+
+        expected_detect_stream = [
+            {
+                "comments": [
+                    "#Genome this_file_does_not_exist.fa"
+                ],
+                "refFasta": "this_file_does_not_exist.fa"
+            },
+            {
+                "readID": "5d10eb8a-aae1-5db8-9ec6-6ebb34d32575",
+                "refContig": "fake",
+                "refStart": 10,
+                "refEnd": 20,
+                "strand": "fwd",
+                "posOnRef": [11, 13, 15, 17],
+                "probBrdU": [0.22, 0.42, 0.62, 0.82],
+                "sixMerOnRef": ["AA", "BB", "CC", "DD"]
+            }
+        ]
+
+        self.assertEqual(
+            expected_detect_stream,
+            list(
+                convert_detect_into_detect_stream(
+                    detect_file_contents.split("\n"), switch_2_and_3=True
+                ))
+        )
+
+        # make fake fasta file and index it
+        with open("sample_2.fa", "w") as dummyFa:
+            dummyFa.write(fasta_file_contents)
+
+        pysam.faidx("sample_2.fa")
+
+        # make modBAM file
+        convert_dnascent_detect_to_modBAM_file(
+            convert_detect_into_detect_stream(detect_file_contents.split("\n"), True),
+            'sample_2.bam', 'T', True, fasta='sample_2.fa')
+
+        # index file
+        pysam.index("sample_2.bam")
+
     @classmethod
     def tearDownClass(cls):
         """ Delete some temporary files """
         os.system("rm sample.bam.bai")
         os.system("rm sample.fa.fai")
+        os.system("rm sample_2.*")
 
 
 if __name__ == '__main__':
