@@ -227,10 +227,10 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
                 ['readID', 'refContig', 'refStart', 'refEnd', 'strand']
             )
 
-            # get sequence from reference
+            # get sequence from reference and convert to upper case
             seq = ref_fasta_file.fetch(oneDetect['refContig'],
                                        oneDetect['refStart'],
-                                       oneDetect['refEnd'])
+                                       oneDetect['refEnd']).upper()
 
             # check that length of retrieved sequence and DNAscent header match
             if not len(seq) == oneDetect['refEnd'] - oneDetect['refStart']:
