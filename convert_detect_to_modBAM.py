@@ -43,6 +43,11 @@ if __name__ == "__main__":
     parser.add_argument('--fasta', required=False,
                         help='(default: "") use this reference genome instead of the one in the detect file',
                         default="")
+    parser.add_argument('--undo-shift-rev-strand-pos', required=False,
+                        action='store_true',
+                        help='(optional) undo position shift on the reverse strand. '
+                             'if you do not know what this means, do not use it.',
+                        default=False)
 
     args = parser.parse_args()
 
@@ -56,7 +61,7 @@ if __name__ == "__main__":
     pgInfo = {
         'ID': 'convert_detect_to_modBAM',
         'PN': 'convert_detect_to_modBAM',
-        'VN': 'v0.1'
+        'VN': 'v0.2'
     }
 
     # make modBAM/modSAM file
@@ -65,4 +70,5 @@ if __name__ == "__main__":
         args.op, args.tag,
         not args.sam,
         pg_info=pgInfo,
-        fasta=args.fasta)
+        fasta=args.fasta,
+        shift_rev_strand_pos=0 if args.undo_shift_rev_strand_pos else 5)
