@@ -595,12 +595,12 @@ def get_mod_mean_per_read_per_interval(mod_bam_file: str, contig: str, start: in
         Iterator w each entry = (read id, mean BrdU, num bases)
 
     Examples:
-        >>> output = list(get_mod_mean_per_read_per_interval("../sample_files/sample.bam", "dummyI", 9, 13, 0.01))
+        >>> output = list(get_mod_mean_per_read_per_interval("sample.bam", "dummyI", 9, 13, 0.01))
         >>> len(output)
         1
         >>> output[0]
         ('5d10eb9a-aae1-4db8-8ec6-7ebb34d32575', 1.0, 2)
-        >>> output = list(get_mod_mean_per_read_per_interval("sample_files/sample.bam", "dummyII", 6, 30, 0.5))
+        >>> output = list(get_mod_mean_per_read_per_interval("sample.bam", "dummyII", 6, 30, 0.5))
         >>> len(output)
         1
         >>> output[0]
@@ -639,7 +639,7 @@ def get_raw_data_from_modBAM(mod_bam_file: str, contig: str, start: int, end: in
         Iterator w each entry = (read id, ref position, probability)
 
     Examples:
-        >>> output = list(get_raw_data_from_modBAM("../sample_files/sample.bam", "dummyI", 9, 13))
+        >>> output = list(get_raw_data_from_modBAM("sample.bam", "dummyI", 9, 13))
         >>> len(output)
         2
         >>> output[0]
@@ -739,15 +739,15 @@ def modBAM_record_to_detect(modbam_line: str, fasta_file_name: str = "", reverse
     Examples:
         >>> sample_first_bam_fields = "loremipsum\t0\tdummyI\t2\t0\t12M\t*\t0\t12\tGCTAGCTATCGT\t*"
         >>> sample_line = f"{sample_first_bam_fields}\tMM:Z:T+T?,1;\tML:B:C,10\tXA:Z:loremipsum_dummyI_1_13_fwd"
-        >>> modBAM_record_to_detect(sample_line, "../sample_files/sample.fa")
+        >>> modBAM_record_to_detect(sample_line, "sample.fa")
         '>loremipsum dummyI 1 13 fwd\n7\t0.041015\tTATCGT'
         >>> modBAM_record_to_detect(sample_line)
         '>loremipsum unmapped 0 12 unstranded\n6\t0.041015\tTATCGT'
         >>> sample_second_bam_fields = "loremipsum2\t16\tdummyI\t3\t0\t19M\t*\t0\t19\tCTAGCTATCGTTTCTGTGA\t*"
         >>> sample_line = f"{sample_second_bam_fields}\tMM:Z:T+g?,1;\tML:B:C,50\tXA:Z:loremipsum2_dummyI_2_21_rev"
-        >>> modBAM_record_to_detect(sample_line, "sample_files/sample.fa", code='g')
+        >>> modBAM_record_to_detect(sample_line, "sample.fa", code='g')
         '>loremipsum2 dummyI 2 21 rev\n3\t0.197265\tTAGCTA'
-        >>> modBAM_record_to_detect(sample_line, "sample_files/sample.fa", reverse_shift=0, code='g')
+        >>> modBAM_record_to_detect(sample_line, "sample.fa", reverse_shift=0, code='g')
         '>loremipsum2 dummyI 2 21 rev\n8\t0.197265\tATCGTT'
         >>> modBAM_record_to_detect(sample_line, reverse_shift=0, code='g')
         '>loremipsum2 unmapped 0 19 unstranded\n12\t0.197265\tTAGCTA'
