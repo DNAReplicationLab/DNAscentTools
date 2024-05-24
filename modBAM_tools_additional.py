@@ -446,8 +446,14 @@ class ModBamRecordProcessor:
             return f">{self.read_id} {self.contig} {self.start} {self.end} " \
                    f"{'rev' if self.is_rev else 'fwd'}"
 
-    def mod_data_to_table(self) -> Iterable[ModBase]:
+    def mod_data_to_table(self, move_parallel_top_ref_strand: bool = False) -> Iterable[ModBase]:
         """ Return modification data in a tabular format
+
+        Args:
+            move_parallel_top_ref_strand: (default False) if True, move parallel to top strand of reference genome.
+                                          Default is to move parallel to the forward sequence, which is the same
+                                          direction as the reference genome for fwd mapping and opposite for rev
+                                          mapping. Option is ignored if the read is unmapped.
 
         Returns:
             iterator with dictionaries with keys read_id, fwd_seq_pos, ref_pos, mod_qual.
@@ -457,6 +463,15 @@ class ModBamRecordProcessor:
 
         if not self.has_data():
             return iter([])
+
+        if move_parallel_top_ref_strand and (not self.is_unmapped) and self.is_rev:
+            return (ModBase(read_id=a, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base, mod_base=self.code,
+                            ref_strand='unmapped' if self.is_unmapped else ('-' if self.is_rev else '+'),
+                            mod_strand='+')
+                    for a, b, c, d in
+                    zip(repeat(self.read_id), reversed(self.fwd_seq_thymidine_coordinates),
+                        reversed(self.fwd_seq_reference_coordinates),
+                        convert_probabilities_from_modBAM_to_normal(reversed(self.raw_probability_modbam_format))))
 
         return (ModBase(read_id=a, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base, mod_base=self.code,
                         ref_strand='unmapped' if self.is_unmapped else ('-' if self.is_rev else '+'), mod_strand='+')
@@ -667,7 +682,8 @@ def get_raw_data_from_modBAM(mod_bam_file: str, contig: str, start: int, end: in
             if x:
                 mod_bam_parser.process_modbam_line(x)
                 if mod_bam_parser.has_data():
-                    for k in filter(lambda y: start <= y.ref_pos < end, mod_bam_parser.mod_data_to_table()):
+                    for k in filter(lambda y: start <= y.ref_pos < end,
+                                    mod_bam_parser.mod_data_to_table(move_parallel_top_ref_strand=True)):
                         yield k.read_id, k.ref_pos, k.mod_qual
     else:
         return iter([])

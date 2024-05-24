@@ -2,6 +2,7 @@ import numpy as np
 import itertools
 import pysam
 from modbampy import ModBam
+from modBAM_tools_additional import get_raw_data_from_modBAM
 
 
 def get_gaps_in_base_pos(pos, seq, base):
@@ -339,26 +340,6 @@ def get_read_data_from_modBAM(mod_bam_file: str, read_id: str,
         Iterator w each entry = (ref pos, probability)
     """
 
-    # function to convert UUID to int
-    def uuid_first_7_char_to_int(x): return int(x[0:7], 16)
-
-    # find relevant records and return data
-    with ModBam(mod_bam_file) as bam:
-        site_data = filter(
-            lambda x: x[2] == read_id and start <= x[0] < end,
-            ((
-                r.rpos, r.qual,
-                r.query_name
-            ) for k in
-                bam.reads(
-                    contig, start, end, tag_name='XR',
-                    tag_value=uuid_first_7_char_to_int(read_id)
-                )
-                for r in k.mod_sites))
-
-        # return data
-        # NOTE: in modBAM, a probability level x means the
-        #   probability lies b/w x/256 and (x+1)/256 and x
-        #   is a number b/w 0 and 255. So we return the midpoint
-        #   of the interval given an x.
-        return map(lambda x: (x[0], (x[1] + x[1] + 1) / (256 * 2)), site_data)
+    return map(lambda x: (x[1], x[2]), get_raw_data_from_modBAM(mod_bam_file, contig, start, end,
+                                                                base='T', code='T', read_id=read_id,
+                                                                allow_multiple_entries_input_read_id=False))
