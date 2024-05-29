@@ -4,7 +4,7 @@ import pysam
 from collections.abc import Callable, Iterable
 from collections import namedtuple
 from functools import reduce
-from itertools import count, accumulate, pairwise, repeat
+from itertools import count, accumulate, pairwise
 
 ModBase = namedtuple('ModBase', (
         'read_id', 'ref_pos', 'fwd_seq_pos', 'ref_strand', 'mod_strand',
@@ -383,8 +383,17 @@ class ModBamRecordProcessor:
 
         return len(self.read_id) > 0
 
-    def count_bases(self) -> tuple[int, int, int]:
+    def count_bases(self, mask_ref_interval: tuple[int, int] = (-1, -1),
+                    mask_fwd_seq_interval:  tuple[int, int] = (-1, -1)) -> tuple[int, int, int]:
         """Count number of modified, unmodified, and bases where modification information is missing.
+
+        Args:
+            mask_ref_interval: (default (-1,-1)) only return counts for reference positions such that a_0 <= a < a_1,
+                               where a_0 and a_1 are the two elements of mask_ref_interval. Default unused.
+                               If you set this and the read is unmapped, you'll get an error.
+            mask_fwd_seq_interval: (default (-1,-1)) only return counts for forward-sequence positions such that
+                                   a_0 <= a < a_1, where a_0 and a_1 are the two elements of mask_fwd_seq_interval.
+                                   Default unused. This works even if the read is unmapped.
 
         Returns:
             tuple of three ints in the order above.
@@ -396,9 +405,33 @@ class ModBamRecordProcessor:
             else:
                 return 0, 0, 0
 
-        count_mod_plus_unmod = len(self.probability_modbam_format)
-        count_mod = sum(self.probability_modbam_format)
-        count_missing = sum(self.thymidine_gaps)
+        if mask_ref_interval != (-1, -1):
+
+            if mask_fwd_seq_interval != (-1, -1):
+                raise ValueError("Cannot mask both reference and forward-sequence intervals!")
+            if self.is_unmapped:
+                raise ValueError("Cannot mask reference interval for unmapped reads!")
+            if mask_ref_interval[0] > mask_ref_interval[1]:
+                raise ValueError("Bad mask_ref_interval!")
+
+            indices = [k for k, a in enumerate(self.fwd_seq_reference_coordinates)
+                       if mask_ref_interval[0] <= a < mask_ref_interval[1]]
+
+        elif mask_fwd_seq_interval != (-1, -1):
+
+            if mask_fwd_seq_interval[0] > mask_fwd_seq_interval[1]:
+                raise ValueError("Bad mask_fwd_seq_interval!")
+
+            indices = [k for k, a in enumerate(self.fwd_seq_thymidine_coordinates)
+                       if mask_fwd_seq_interval[0] <= a < mask_fwd_seq_interval[1]]
+
+        else:
+
+            indices = range(len(self.probability_modbam_format))
+
+        count_mod_plus_unmod = len(indices)
+        count_mod = sum(self.probability_modbam_format[k] for k in indices)
+        count_missing = sum(self.thymidine_gaps[k] for k in indices)
 
         return count_mod, count_mod_plus_unmod - count_mod, count_missing
 
@@ -411,10 +444,14 @@ class ModBamRecordProcessor:
         if not self.has_data():
             raise ValueError("No data available!")
 
+        # first, we account for implicit skips
+        num_end_insertions = (len([k for k in self.fwd_seq if k == self.base]) - sum(self.thymidine_gaps)
+                              - len(self.thymidine_gaps))
+
         # find positions where we need to insert zeroes and insert them.
         thymidine_zero_insertions = reduce(lambda x, y: x + [y[0]] * y[1],
                                            filter(lambda x: x[1] > 0,
-                                                  zip(range(len(self.thymidine_gaps)), self.thymidine_gaps)),
+                                                  enumerate(self.thymidine_gaps + [num_end_insertions])),
                                            [])
         self.probability_modbam_format = list(np.insert(self.probability_modbam_format, thymidine_zero_insertions, 0))
         self.raw_probability_modbam_format = list(np.insert(self.raw_probability_modbam_format,
@@ -464,20 +501,17 @@ class ModBamRecordProcessor:
         if not self.has_data():
             return iter([])
 
-        if move_parallel_top_ref_strand and (not self.is_unmapped) and self.is_rev:
-            return (ModBase(read_id=a, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base, mod_base=self.code,
-                            ref_strand='unmapped' if self.is_unmapped else ('-' if self.is_rev else '+'),
-                            mod_strand='+')
-                    for a, b, c, d in
-                    zip(repeat(self.read_id), reversed(self.fwd_seq_thymidine_coordinates),
-                        reversed(self.fwd_seq_reference_coordinates),
-                        convert_probabilities_from_modBAM_to_normal(reversed(self.raw_probability_modbam_format))))
+        rev = move_parallel_top_ref_strand and (not self.is_unmapped) and self.is_rev
+        fwd_seq_coords = reversed(self.fwd_seq_thymidine_coordinates) if rev else self.fwd_seq_thymidine_coordinates
+        ref_coords = reversed(self.fwd_seq_reference_coordinates) if rev else self.fwd_seq_reference_coordinates
+        probs = convert_probabilities_from_modBAM_to_normal(
+                    reversed(self.raw_probability_modbam_format) if rev else self.raw_probability_modbam_format)
 
-        return (ModBase(read_id=a, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base, mod_base=self.code,
-                        ref_strand='unmapped' if self.is_unmapped else ('-' if self.is_rev else '+'), mod_strand='+')
-                for a, b, c, d in
-                zip(repeat(self.read_id), self.fwd_seq_thymidine_coordinates, self.fwd_seq_reference_coordinates,
-                    convert_probabilities_from_modBAM_to_normal(self.raw_probability_modbam_format)))
+        return (ModBase(read_id=self.read_id, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base,
+                        mod_base=self.code,
+                        ref_strand='unmapped' if self.is_unmapped else ('-' if self.is_rev else '+'),
+                        mod_strand='+')
+                for b, c, d in zip(fwd_seq_coords, ref_coords, probs))
 
 
 def reverse_complement(x: str) -> str:

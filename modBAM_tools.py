@@ -1,8 +1,7 @@
 import numpy as np
 import itertools
 import pysam
-from modbampy import ModBam
-from modBAM_tools_additional import get_raw_data_from_modBAM
+from modBAM_tools_additional import get_raw_data_from_modBAM, ModBamRecordProcessor
 
 
 def get_gaps_in_base_pos(pos, seq, base):
@@ -304,25 +303,51 @@ def get_mod_counts_per_interval(mod_bam_file, intervals, base,
             modified counts in reverse and forward strands
     """
 
-    base_to_num = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
-    base_num = base_to_num[base]
+    if not low_thres == high_thres:
+        raise NotImplementedError("Low and high thresholds must be equal")
 
-    with ModBam(mod_bam_file) as bam:
-        # get position and counts of bases in each interval
-        t1 = list(map(lambda k:
-                      bam.pileup(
-                          k[0], k[1], k[2],
-                          low_threshold=low_thres,
-                          high_threshold=high_thres,
-                          mod_base=mod_code),
-                      intervals))
+    # set up mod bam parser
+    mod_bam_parser = ModBamRecordProcessor(low_thres, mod_code, allow_non_na_mode=True, base=base)
 
-        # prepare to sum up the counts in each interval
-        def f(index): return map(lambda k:
-                                 int(sum(entry[index] for entry in k[1])), t1)
+    # set up output counts
+    unmod_counts_fwd_list = []
+    unmod_counts_rev_list = []
+    mod_counts_fwd_list = []
+    mod_counts_rev_list = []
 
-        # return values
-        return f(base_num), f(base_num + 4), f(10), f(11)
+    # iterate through the intervals
+    for contig, start, end in intervals:
+
+        unmod_counts_fwd = 0
+        unmod_counts_rev = 0
+        mod_counts_fwd = 0
+        mod_counts_rev = 0
+
+        # find the records
+        alignments = pysam.view(mod_bam_file, f"{contig}:{start}-{end}")
+
+        # iterate through records
+        if len(alignments) > 0:
+            for x in alignments.splitlines():
+                if x:
+                    # get modification counts and assign them suitably
+                    mod_bam_parser.process_modbam_line(x)
+                    count_mod, count_unmod, _ = mod_bam_parser.count_bases(mask_ref_interval=(start, end))
+                    if mod_bam_parser.is_rev:
+                        unmod_counts_rev += count_unmod
+                        mod_counts_rev += count_mod
+                    else:
+                        unmod_counts_fwd += count_unmod
+                        mod_counts_fwd += count_mod
+
+        # store counts
+        unmod_counts_fwd_list.append(unmod_counts_fwd)
+        unmod_counts_rev_list.append(unmod_counts_rev)
+        mod_counts_fwd_list.append(mod_counts_fwd)
+        mod_counts_rev_list.append(mod_counts_rev)
+
+    return (iter(unmod_counts_rev_list), iter(unmod_counts_fwd_list), iter(mod_counts_rev_list),
+            iter(mod_counts_fwd_list))
 
 
 def get_read_data_from_modBAM(mod_bam_file: str, read_id: str,

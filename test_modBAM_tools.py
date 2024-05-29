@@ -1,13 +1,13 @@
 import unittest
 import os
 import pysam
-from modbampy import ModBam
 from modBAM_tools import get_gaps_in_base_pos, \
     convert_detect_into_detect_stream, \
     convert_data_per_T_to_modBAM_fmt, \
     convert_dnascent_detect_to_modBAM_file, \
     get_mod_counts_per_interval, \
     get_read_data_from_modBAM
+from modBAM_tools_additional import get_raw_data_from_modBAM, ModBamRecordProcessor
 
 
 class TestDetectToModBAMSuite(unittest.TestCase):
@@ -216,33 +216,50 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         self.assertEqual([[0, 0, 0], [1, 1, 2], [0, 0, 0], [0, 0, 0]],
                          list(list(k) for k in t))
 
-        # test that individual sites look ok
-        # note: fffffff, the first 7 letters of read id, become
-        # 16 ** 7 - 1 when converted to decimal
+    def test_modBAM_retrieval_1a(self):
+        """ Test that modBAM retrieval works """
 
-        with ModBam("sample.bam") as bam:
-            site_data = [
-                (
-                    p.rpos, p.qpos, p.qual,
-                    p.query_name, p.strand, p.mstrand, p.cbase, p.mbase
-                ) for k in
-                bam.reads(
-                    'dummyII', 3, 36, tag_name='XR',
-                    tag_value=16 ** 7 - 1
-                )
-                for p in k.mod_sites]
+        # test that individual sites look ok using the mod_data_to_table method
+        alignments = pysam.view("-e", f"qname==\"fffffff1-10d2-49cb-8ca3-e8d48979001b\"",
+                                "sample.bam", "dummyII:3-36")
+        split_lines = alignments.splitlines()
+        if sum([1 for k in split_lines if k]) > 1:
+            raise ValueError("More than one alignment found")
 
-            site_tuple = ("fffffff1-10d2-49cb-8ca3-e8d48979001b",
-                          "-", 0, 'T', 'T')
+        mod_bam_record = ModBamRecordProcessor(0.01, 'T', base='T', allow_non_na_mode=True)
+        mod_bam_record.process_modbam_line(split_lines[0])
 
-            self.assertEqual(site_data,
-                             [
-                                 (15, 12, 3, *site_tuple),
-                                 (16, 13, 3, *site_tuple),
-                                 (19, 16, 4, *site_tuple),
-                                 (22, 19, 3, *site_tuple),
-                                 (23, 20, 182, *site_tuple),
-                             ])
+        site_data = [
+            (
+                p.ref_pos, p.fwd_seq_pos, p.mod_qual,
+                p.read_id, p.ref_strand, p.mod_strand, p.can_base, p.mod_base
+            ) for p in mod_bam_record.mod_data_to_table(move_parallel_top_ref_strand=True)]
+
+        site_tuple = ("fffffff1-10d2-49cb-8ca3-e8d48979001b",
+                      "-", "+", 'T', 'T')
+
+        self.assertEqual(site_data,
+                         [
+                             (15, 20, (3 + 4)/(2 * 256), *site_tuple),
+                             (16, 19, (3 + 4)/(2 * 256), *site_tuple),
+                             (19, 16, (4 + 5)/(2 * 256), *site_tuple),
+                             (22, 13, (3 + 4)/(2 * 256), *site_tuple),
+                             (23, 12, (182 + 183)/(2 * 256), *site_tuple),
+                         ])
+
+    def test_modBAM_retrieval_1b(self):
+        """ Test that modBAM retrieval works """
+
+        self.assertEqual(list(get_raw_data_from_modBAM("sample.bam",
+                                                       "dummyII", 3, 36, "T", "T",
+                                                       "fffffff1-10d2-49cb-8ca3-e8d48979001b")),
+                         [
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 15, (3 + 4)/(2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 16, (3 + 4)/(2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 19, (4 + 5)/(2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 22, (3 + 4)/(2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 23, (182 + 183)/(2 * 256)),
+                         ])
 
     def test_modBAM_retrieval_2(self):
         """ Test retrieval of data from modbam file """
