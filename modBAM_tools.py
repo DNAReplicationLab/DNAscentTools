@@ -118,12 +118,12 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
                 # skip malformed lines if they exist
                 if len(split_line) == 3:
                     current_entry['posOnRef'].append(int(split_line[0]))
-                    current_entry['probBrdU'].append(float(split_line[1]))
-                    current_entry['sixMerOnRef'].append(split_line[2])
+                    current_entry['probBrdU'].append(float(split_line[col2]))
+                    current_entry['sixMerOnRef'].append(split_line[col3])
                 elif len(split_line) == 4:
                     current_entry['posOnRef'].append(int(split_line[0]))
-                    current_entry['probEdU'].append(float(split_line[1]))
-                    current_entry['probBrdU'].append(float(split_line[2]))
+                    current_entry['probEdU'].append(float(split_line[col2]))
+                    current_entry['probBrdU'].append(float(split_line[col3]))
                     current_entry['sixMerOnRef'].append(split_line[3])
                 else:
                     continue

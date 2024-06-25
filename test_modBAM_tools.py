@@ -390,6 +390,7 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                 "strand": "fwd",
                 "posOnRef": [11, 13, 15, 17],
                 "probBrdU": [0.22, 0.42, 0.62, 0.82],
+                "probEdU": [],
                 "sixMerOnRef": ["AA", "BB", "CC", "DD"]
             }
         ]
