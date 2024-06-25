@@ -88,6 +88,7 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
                 'strand': split_line[4],
                 'posOnRef': [],
                 'probBrdU': [],
+                'probEdU': [],
                 'sixMerOnRef': []
             }
 
@@ -113,14 +114,19 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
                 # split data lines by whitespace
                 split_line = line.rstrip().split()
 
-                # skip malformed lines if they exist
-                if not len(split_line) == 3:
-                    continue
-
                 # store data
-                current_entry['posOnRef'].append(int(split_line[0]))
-                current_entry['probBrdU'].append(float(split_line[col2]))
-                current_entry['sixMerOnRef'].append(split_line[col3])
+                # skip malformed lines if they exist
+                if len(split_line) == 3:
+                    current_entry['posOnRef'].append(int(split_line[0]))
+                    current_entry['probBrdU'].append(float(split_line[1]))
+                    current_entry['sixMerOnRef'].append(split_line[2])
+                elif len(split_line) == 4:
+                    current_entry['posOnRef'].append(int(split_line[0]))
+                    current_entry['probEdU'].append(float(split_line[1]))
+                    current_entry['probBrdU'].append(float(split_line[2]))
+                    current_entry['sixMerOnRef'].append(split_line[3])
+                else:
+                    continue
 
             # return current record
             yield current_entry
@@ -159,7 +165,9 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
             probBrdU (list of floats) which correspond to data per detect from
             the detect file.
         filename (str): name of output file
-        code (str): default 472552, modification code (ChEBI code or 1 letter)
+        code (str): default 472552, modification code (ChEBI code or 1 letter). If using a two-analogue
+            version of DNAscent, specify two codes using the format code_1+code_2. e.g. 62903+472252.
+            code_1 and _2 correspond to the second and third columns in the detect file respectively.
         bam_file (bool): default T, T/F = bam/sam file
         shift_rev_strand_pos (int): default 5. See note above, in fn docstr.
         pg_info (dict): (default None = no info). Info abt program, must
@@ -250,7 +258,7 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
 
             # scale probabilities from 0 to 255
             prob_frm0_to255 = convert_data_per_T_to_modBAM_fmt(
-                oneDetect['probBrdU'])
+                oneDetect['probEdU'] + oneDetect['probBrdU'])
 
             # get number of skipped Ts b/w each T for which data is available
             # NOTE: the fn get_forward_sequence() returns seq if the reversed
@@ -275,7 +283,16 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
 
             # set modification positions and values
             # ChEBI code for BrdU is 472552
-            seg.set_tag("MM", f"T+{code}?,{str_gaps_in_t};", "Z")
+            # check if multiple analogues are used
+            if '+' not in code:
+                if len(oneDetect['probEdU']) == 0:
+                    seg.set_tag("MM", f"T+{code}?,{str_gaps_in_t};", "Z")
+                else:
+                    raise ValueError('Please specify two codes if using a two-analogue version of DNAscent')
+            else:
+                code_1, code_2 = fn_rev_if_needed(code.split('+'))
+                seg.set_tag("MM", f"T+{code_1}?,{str_gaps_in_t};" + f"T+{code_2}?,{str_gaps_in_t};", "Z")
+
             seg.set_tag("ML", list(fn_rev_if_needed(prob_frm0_to255)))
             seg.set_tag("XR", uuid_first7_char_to_int(oneDetect['readID']), "i")
             seg.set_tag("XA", f"{detect_header}", "Z")

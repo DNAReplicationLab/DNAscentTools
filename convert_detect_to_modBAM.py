@@ -30,7 +30,10 @@ if __name__ == "__main__":
                         help='output modBAM file')
     parser.add_argument('--tag', type=str, required=False,
                         help=('(default: 472552, which is BrdU) ChEBI code or one letter '
-                              'code of base modification'),
+                              'code of base modification. If using a two-analogue '
+                              'version of DNAscent, specify two codes using the format '
+                              'code_1+code_2. e.g. 62903+472252. code_1 and _2 correspond '
+                              'to the second and third columns in the detect file respectively'),
                         default='472552')
     parser.add_argument('--sam', required=False,
                         action='store_true',
