@@ -12,4 +12,4 @@ genome as input and produce a BAM file, with probabilities of
 thymidine modification along each read specified using tags.
 
 Please look at run_detect_to_modBAM.sh for an example on how to
-perform a detect to modBAM conversion, and the sample bam/sam files.
+perform a detect to modBAM conversion for different versions of DNAscent detect.
