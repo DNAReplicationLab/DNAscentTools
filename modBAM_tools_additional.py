@@ -513,6 +513,49 @@ class ModBamRecordProcessor:
                         mod_strand='+')
                 for b, c, d in zip(fwd_seq_coords, ref_coords, probs))
 
+    def calculate_autocorrelations(self, chunk_size: int = 10000, window_size: int = 300,
+                                   chunk_overlap_fraction: float = 0.0) -> tuple[list[float]]:
+        """ Calculate autocorrelations in the thresholded and windowed modification probability per given chunk size.
+
+        Args:
+            chunk_size: (default 10000) split read into (non-overlapping by default) chunks of this many thymidines and
+                        calculate correlations separately for each chunk. The last chunk will be smaller if the read
+                        length is not a multiple of chunk_size. Also see chunk_overlap_fraction.
+            window_size: (default 300) window data in this window size (of thymidines, non-overlapping windows)
+                         before calculating autocorrelations.
+            chunk_overlap_fraction: (default 0.0) When we split read into chunks, stipulate that chunks should overlap
+                                    by this fraction of chunk_size. This is a float >= 0 and < 1. Do not choose values
+                                    close to 1 as this means a high level of chunk overlap.
+
+        Returns:
+            tuple of N lists of floats where N = read length // chunk_size.
+            Each float list contains autocorrelations for the corresponding chunk at different lag distances.
+
+        """
+        # function to chunk and window data
+        def window_non_overlapping(x):
+            v = np.lib.stride_tricks.sliding_window_view(x, window_size)[::window_size, :]
+            return v.mean(axis=-1)
+
+        # set stride length for chunking
+        stride = int(chunk_size * (1 - chunk_overlap_fraction))
+
+        # check that stride is between 1 and chunk_size
+        if not 1 <= stride <= chunk_size:
+            raise ValueError("Bad chunk_overlap_fraction!")
+
+        # divide self.probability_modbam_format into chunks of size chunk_size and window each chunk
+        chunked_data = [window_non_overlapping(np.array(self.probability_modbam_format[i:i + chunk_size], dtype=float))
+                        for i in range(0, len(self.probability_modbam_format), stride)]
+
+        # normalize each chunk by its mean and the sd (we multiply by sqrt of length of chunk in denominator to ensure
+        # the first autocorrelation data point is 1)
+        norm_chunked_data = [(chunk - np.mean(chunk))/(np.std(chunk) * np.sqrt(len(chunk))) for chunk in chunked_data]
+
+        # calculate autocorrelations for each chunk
+        return tuple(np.correlate(chunk, chunk, mode='full')[(len(chunk) - 1):(2*len(chunk) - 1)].tolist()
+                     for chunk in norm_chunked_data)
+
 
 def reverse_complement(x: str) -> str:
     """ Get reverse complement of a DNA sequence using samtools reversed read apparatus
