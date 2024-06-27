@@ -550,13 +550,13 @@ class ModBamRecordProcessor:
         chunked_data = [window_non_overlapping(np.array(self.probability_modbam_format[i:i + chunk_size], dtype=float))
                         for i in range(0, len(self.probability_modbam_format), stride)]
 
-        # normalize each chunk by its mean and the sd (we multiply by sqrt of length of chunk in denominator to ensure
-        # the first autocorrelation data point is 1)
-        norm_chunked_data = [(chunk - np.mean(chunk))/(np.std(chunk) * np.sqrt(len(chunk))) for chunk in chunked_data
-                             if (chunk is not None and len(chunk) > 2 and np.std(chunk) > 0)]
+        # normalize each chunk by its mean and the sd
+        norm_chunked_data = [(chunk - np.mean(chunk))/(np.std(chunk) + 1e-10) for chunk in chunked_data
+                             if chunk is not None]
 
         # calculate autocorrelations for each chunk
-        return tuple(np.correlate(chunk, chunk, mode='full')[(len(chunk) - 1):(2*len(chunk) - 1)].tolist()
+        return tuple((np.correlate(chunk, chunk, mode='full')[(len(chunk) - 1):(2*len(chunk) - 1)] *
+                      1/np.linspace(len(chunk), 1, num=len(chunk))).tolist()
                      for chunk in norm_chunked_data)
 
 
