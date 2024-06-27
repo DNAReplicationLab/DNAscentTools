@@ -520,7 +520,8 @@ class ModBamRecordProcessor:
         Args:
             chunk_size: (default 10000) split read into (non-overlapping by default) chunks of this many thymidines and
                         calculate correlations separately for each chunk. The last chunk will be smaller if the read
-                        length is not a multiple of chunk_size. Also see chunk_overlap_fraction.
+                        length is not a multiple of chunk_size (and may be rejected if it is too small).
+                        Also see chunk_overlap_fraction.
             window_size: (default 300) window data in this window size (of thymidines, non-overlapping windows)
                          before calculating autocorrelations.
             chunk_overlap_fraction: (default 0.0) When we split read into chunks, stipulate that chunks should overlap
@@ -533,10 +534,10 @@ class ModBamRecordProcessor:
 
         """
         # function to chunk and window data
-        def window_non_overlapping(x):
-            if len(x) < window_size:
+        def window_non_overlapping(x, l_win, l_min):
+            if len(x) < max(l_win, l_min):
                 return
-            v = np.lib.stride_tricks.sliding_window_view(x, window_size)[::window_size, :]
+            v = np.lib.stride_tricks.sliding_window_view(x, l_win)[::l_win, :]
             return v.mean(axis=-1)
 
         # set stride length for chunking
@@ -547,7 +548,8 @@ class ModBamRecordProcessor:
             raise ValueError("Bad chunk_overlap_fraction!")
 
         # divide self.probability_modbam_format into chunks of size chunk_size and window each chunk
-        chunked_data = [window_non_overlapping(np.array(self.probability_modbam_format[i:i + chunk_size], dtype=float))
+        chunked_data = [window_non_overlapping(np.array(self.probability_modbam_format[i:i + chunk_size], dtype=float),
+                                               window_size, chunk_size/2)
                         for i in range(0, len(self.probability_modbam_format), stride)]
 
         # normalize each chunk by its mean and the sd
