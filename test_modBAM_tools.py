@@ -7,7 +7,8 @@ from modBAM_tools import get_gaps_in_base_pos, \
     convert_dnascent_detect_to_modBAM_file, \
     get_mod_counts_per_interval, \
     get_read_data_from_modBAM
-from modBAM_tools_additional import get_raw_data_from_modBAM, ModBamRecordProcessor
+from modBAM_tools_additional import get_raw_data_from_modBAM, \
+    ModBamRecordProcessor, parse_modBAM_modification_information
 
 
 class TestDetectToModBAMSuite(unittest.TestCase):
@@ -243,11 +244,11 @@ class TestDetectToModBAMSuite(unittest.TestCase):
 
         self.assertEqual(site_data,
                          [
-                             (15, 20, (3 + 4)/(2 * 256), *site_tuple),
-                             (16, 19, (3 + 4)/(2 * 256), *site_tuple),
-                             (19, 16, (4 + 5)/(2 * 256), *site_tuple),
-                             (22, 13, (3 + 4)/(2 * 256), *site_tuple),
-                             (23, 12, (182 + 183)/(2 * 256), *site_tuple),
+                             (15, 20, (3 + 4) / (2 * 256), *site_tuple),
+                             (16, 19, (3 + 4) / (2 * 256), *site_tuple),
+                             (19, 16, (4 + 5) / (2 * 256), *site_tuple),
+                             (22, 13, (3 + 4) / (2 * 256), *site_tuple),
+                             (23, 12, (182 + 183) / (2 * 256), *site_tuple),
                          ])
 
     def test_modBAM_retrieval_1b(self):
@@ -257,11 +258,11 @@ class TestDetectToModBAMSuite(unittest.TestCase):
                                                        "dummyII", 3, 36, "T", "T",
                                                        "fffffff1-10d2-49cb-8ca3-e8d48979001b")),
                          [
-                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 15, (3 + 4)/(2 * 256)),
-                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 16, (3 + 4)/(2 * 256)),
-                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 19, (4 + 5)/(2 * 256)),
-                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 22, (3 + 4)/(2 * 256)),
-                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 23, (182 + 183)/(2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 15, (3 + 4) / (2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 16, (3 + 4) / (2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 19, (4 + 5) / (2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 22, (3 + 4) / (2 * 256)),
+                             ("fffffff1-10d2-49cb-8ca3-e8d48979001b", 23, (182 + 183) / (2 * 256)),
                          ])
 
     def test_modBAM_retrieval_2(self):
@@ -416,6 +417,63 @@ class TestDetectToModBAMSuite(unittest.TestCase):
 
         # index file
         pysam.index("sample_2.bam")
+
+    def test_parse_modBAM_modification_information(self):
+        """ Test parsing of modBAM modification information """
+
+        mod_information_1 = "MM:Z:T+m?,1,0,0;\tML:B:C,100,200,100"
+
+        expected_result_1 = [
+            {
+                "base": "T",
+                "mod_strand": "+",
+                "mod_code": "m",
+                "mode": "?",
+                "pos": [1, 0, 0],
+                "prob": [100, 200, 100]
+            }
+        ]
+
+        mod_information_2 = "MM:Z:T+99001.,1,0,0;\tML:B:C,100,200,100"
+        expected_result_2 = [{"base": "T", "mod_code": 99001, "mode": ".", "mod_strand": "+",
+                              "pos": [1, 0, 0], "prob": [100, 200, 100]}]
+
+        mod_information_3 = "MM:Z:T+de,1,0,0;C-h?,2,0;\tML:B:C,100,200,100,50,22"
+        expected_result_3 = [{"base": "T", "mod_code": "d", "mode": ".", "mod_strand": "+",
+                              "pos": [1, 0, 0], "prob": [100, 200, 100]},
+                             {"base": "T", "mod_code": "e", "mode": ".", "mod_strand": "+",
+                              "pos": [1, 0, 0], "prob": [100, 200, 100]},
+                             {"base": "C", "mod_code": "h", "mode": "?", "mod_strand": "-",
+                              "pos": [2, 0], "prob": [50, 22]}]
+
+        mod_information_4 = "MM:Z:T+d,1,0,0;\tML:B:C,100,200,100"
+        expected_result_4 = [{"base": "T", "mod_code": "d", "mode": ".", "mod_strand": "+",
+                              "pos": [1, 0, 0], "prob": [100, 200, 100]}]
+
+        mod_information_5 = "MM:Z:T+c.,1,0,0;\tML:B:C,100,200,100"
+        expected_result_5 = [{"base": "T", "mod_code": "c", "mode": ".", "mod_strand": "+",
+                              "pos": [1, 0, 0], "prob": [100, 200, 100]}]
+
+        self.assertEqual(
+            expected_result_1,
+            parse_modBAM_modification_information(mod_information_1)
+        )
+        self.assertEqual(
+            expected_result_2,
+            parse_modBAM_modification_information(mod_information_2)
+        )
+        self.assertEqual(
+            expected_result_3,
+            parse_modBAM_modification_information(mod_information_3)
+        )
+        self.assertEqual(
+            expected_result_4,
+            parse_modBAM_modification_information(mod_information_4)
+        )
+        self.assertEqual(
+            expected_result_5,
+            parse_modBAM_modification_information(mod_information_5)
+        )
 
     @classmethod
     def tearDownClass(cls):

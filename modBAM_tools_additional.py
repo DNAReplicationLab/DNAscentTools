@@ -7,8 +7,10 @@ from functools import reduce
 from itertools import count, accumulate, pairwise
 
 ModBase = namedtuple('ModBase', (
-        'read_id', 'ref_pos', 'fwd_seq_pos', 'ref_strand', 'mod_strand',
-        'can_base', 'mod_base', 'mod_qual'), defaults=('', -1, -1, 'unstranded', 'unstranded', '', '', -1))
+    'read_id', 'ref_pos', 'fwd_seq_pos', 'ref_strand', 'mod_strand',
+    'can_base', 'mod_base', 'mod_qual'), defaults=('', -1, -1, 'unstranded', 'unstranded', '', '', -1))
+
+
 # above tuple based on the class ModInfo of the now un-maintained modbampy package
 
 
@@ -384,7 +386,7 @@ class ModBamRecordProcessor:
         return len(self.read_id) > 0
 
     def count_bases(self, mask_ref_interval: tuple[int, int] = (-1, -1),
-                    mask_fwd_seq_interval:  tuple[int, int] = (-1, -1)) -> tuple[int, int, int]:
+                    mask_fwd_seq_interval: tuple[int, int] = (-1, -1)) -> tuple[int, int, int]:
         """Count number of modified, unmodified, and bases where modification information is missing.
 
         Args:
@@ -505,7 +507,7 @@ class ModBamRecordProcessor:
         fwd_seq_coords = reversed(self.fwd_seq_thymidine_coordinates) if rev else self.fwd_seq_thymidine_coordinates
         ref_coords = reversed(self.fwd_seq_reference_coordinates) if rev else self.fwd_seq_reference_coordinates
         probs = convert_probabilities_from_modBAM_to_normal(
-                    reversed(self.raw_probability_modbam_format) if rev else self.raw_probability_modbam_format)
+            reversed(self.raw_probability_modbam_format) if rev else self.raw_probability_modbam_format)
 
         return (ModBase(read_id=self.read_id, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base,
                         mod_base=self.code,
@@ -533,6 +535,7 @@ class ModBamRecordProcessor:
             Each float list contains autocorrelations for the corresponding chunk at different lag distances.
 
         """
+
         # function to chunk and window data
         def window_non_overlapping(x, l_win, l_min):
             if len(x) < max(l_win, l_min):
@@ -549,17 +552,101 @@ class ModBamRecordProcessor:
 
         # divide self.probability_modbam_format into chunks of size chunk_size and window each chunk
         chunked_data = [window_non_overlapping(np.array(self.probability_modbam_format[i:i + chunk_size], dtype=float),
-                                               window_size, chunk_size/2)
+                                               window_size, chunk_size / 2)
                         for i in range(0, len(self.probability_modbam_format), stride)]
 
         # normalize each chunk by its mean and the sd
-        norm_chunked_data = [(chunk - np.mean(chunk))/(np.std(chunk) + 1e-10) for chunk in chunked_data
+        norm_chunked_data = [(chunk - np.mean(chunk)) / (np.std(chunk) + 1e-10) for chunk in chunked_data
                              if chunk is not None]
 
         # calculate autocorrelations for each chunk
-        return tuple((np.correlate(chunk, chunk, mode='full')[(len(chunk) - 1):(2*len(chunk) - 1)] *
-                      1/np.linspace(len(chunk), 1, num=len(chunk))).tolist()
+        return tuple((np.correlate(chunk, chunk, mode='full')[(len(chunk) - 1):(2 * len(chunk) - 1)] *
+                      1 / np.linspace(len(chunk), 1, num=len(chunk))).tolist()
                      for chunk in norm_chunked_data)
+
+
+def parse_modBAM_modification_information(input_string: str) -> list[dict]:
+    r""" Parse modification information from modBAM string
+
+    Args:
+        input_string: modBAM string containing modification information e.g. MM:Z:T+T?,1,2,3;\tML:B:C,1,2,3
+
+    Returns:
+        list of dictionaries containing the keys base, mod_strand, mod_code, mode, pos, prob
+
+    Examples:
+        >>> parse_modBAM_modification_information("MM:Z:T+T?,1,2,3;\tML:B:C,1,2,3")
+        [{'base': 'T', 'mod_strand': '+', 'mod_code': 'T', 'mode': '?', 'pos': [1, 2, 3], 'prob': [1, 2, 3]}]
+        >>> parse_modBAM_modification_information("MM:Z:G-h,1,2;\tML:B:C,100,120")
+        [{'base': 'G', 'mod_strand': '-', 'mod_code': 'h', 'mode': '.', 'pos': [1, 2], 'prob': [100, 120]}]
+    """
+
+    def int_within_num(x: str, num: int) -> int:
+        """Converts a string to an int if is a number between 0 and num (both inclusive), else raise Exception"""
+        try:
+            n = int(x)
+            assert (0 <= n <= num)
+            return n
+        except (ValueError, AssertionError) as e:
+            raise ValueError("Bad probability!")
+
+    # Initialize the output list
+    result = []
+
+    # get the MM and ML parts which correspond to modification position and probability
+    temp_1, ml_part = input_string.split("\t")
+    temp_2 = temp_1.split(";")
+    mm_parts = temp_2[:-1]
+
+    # ensure that ML and MM strings appear where they should and remove after check
+    assert (mm_parts[0].startswith(("MM:Z:", "Mm:Z:")))
+    assert (ml_part.startswith(("Ml:B:C,", "ML:B:C,")))
+    mm_parts[0] = mm_parts[0][5:]
+    ml_part = ml_part[7:]
+
+    # make a list for probability data
+    prob = list(map(lambda x: int_within_num(x, 255), ml_part.split(",")))
+
+    # counter to slice probability data
+    cnt_prob = 0
+
+    for mm_part in mm_parts:
+
+        # split the MM part into its components: first bit is about the modification code, the rest are positions
+        l = mm_part.split(",")
+        assert (len(l) > 1)
+
+        # set modification code. This could be a single letter, a number, or a string of letters
+        is_ending_with_mode = l[0].endswith(("?", "."))
+        mod_code_str = l[0][2:-1] if is_ending_with_mode else l[0][2:]
+        assert (len(mod_code_str) > 0)
+
+        if mod_code_str.isdigit():
+            mod_code_list = [int(mod_code_str)]
+        elif mod_code_str.isalpha():
+            mod_code_list = list(mod_code_str)
+            # check that the modification codes are unique
+            assert (len(mod_code_list) == len(set(mod_code_list)))
+        else:
+            raise ValueError("Bad modification code!")
+
+        # store modification information per modification code
+        large_num = 1_000_000_000
+        for mod_code in mod_code_list:
+            base = l[0][0]
+            mod_strand = l[0][1]
+            assert (base in ["A", "G", "C", "T", "N"])
+            assert (mod_strand in ["+", "-"])
+            result.append({"base": base,
+                           "mod_strand": mod_strand,
+                           "mod_code": mod_code,
+                           "mode": l[0][-1] if is_ending_with_mode else ".",
+                           "pos": list(map(lambda x: int_within_num(x, large_num), l[1:])),  # large_num is arbitrary
+                           "prob": prob[cnt_prob: cnt_prob + len(l) - 1]
+                           })
+        cnt_prob += len(l) - 1
+
+    return result
 
 
 def reverse_complement(x: str) -> str:
