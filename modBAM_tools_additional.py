@@ -239,13 +239,6 @@ class ModBamRecordProcessor:
         self.base = base
         self.force_missing = force_missing
 
-        if self.allow_non_na_mode:
-            self.thymidine_gap_str_prefix = [f"MM:Z:{base}+{code}?,", f"Mm:Z:{base}+{code}?,",
-                                             f"MM:Z:{base}+{code},", f"Mm:Z:{base}+{code},",
-                                             f"MM:Z:{base}+{code}.,", f"Mm:Z:{base}+{code}.,"]
-        else:
-            self.thymidine_gap_str_prefix = [f"MM:Z:{base}+{code}?,", f"Mm:Z:{base}+{code}?,"]
-
         self.delete_data()
 
     def delete_data(self) -> None:
@@ -281,40 +274,21 @@ class ModBamRecordProcessor:
         # delete previously stored data
         self.delete_data()
 
-        # set some flags
-        non_na_mode_requested = False
-        is_modification_positions_received = False
-        is_modification_probabilities_received = False
+        # variables to receive data from mod bam line
+        ml_part = ""
+        mm_part = ""
 
         for cnt, k in zip(count(), x.strip().split("\t")):
 
-            if any(k.startswith(tag) for tag in self.thymidine_gap_str_prefix):
-
-                # make sure we got the modification requested.
-                # read data associated with thymidine gaps.
-                self.thymidine_gaps = [int(m) for m in k[:-1].split(",")[1:]]
-
-                # check if non na mode is requested
-                non_na_mode_requested = not any(k.startswith(tag) for tag in self.thymidine_gap_str_prefix[0:2])
-
-                is_modification_positions_received = True
-
-            elif ((k.startswith("ML:B:C") or k.startswith("Ml:B:C")) and
-                  (is_modification_positions_received and not is_modification_probabilities_received)):
-
-                # read probability data and threshold
-                self.raw_probability_modbam_format = [int(m) for m in k.split(",")[1:]]
-                self.probability_modbam_format = [1 if n >= self.threshold * 256 else 0
-                                                  for n in self.raw_probability_modbam_format]
-                is_modification_probabilities_received = True
-
+            if cnt >= 11 and k.startswith(("MM:Z:", "Mm:Z:")):
+                mm_part = k
+            elif cnt >= 11 and k.startswith(("Ml:B:C,", "ML:B:C,")):
+                ml_part = k
             elif cnt == 0:
                 self.read_id = k
-
             elif (not (cnt == 0 or self.is_unmapped)) and k.startswith("XA:Z:") and self.use_xa_tag:
                 self.read_id = k[5:]
                 self.is_alt_read_id = True
-
             elif 1 <= cnt <= 9:
                 if cnt == 1:
                     self.flag = int(k)
@@ -349,15 +323,21 @@ class ModBamRecordProcessor:
         else:
             self.fwd_seq = self.seq
 
-        if is_modification_positions_received:
+        mod_data = list(filter(lambda y: y["base"] == self.base and y["mod_code"] == self.code,
+                               parse_modBAM_modification_information(f"{mm_part}\t{ml_part}")))
 
-            # if modification positions were received but not modification probabilities, set probabilities to -1
-            if not is_modification_probabilities_received:
-                self.probability_modbam_format = [-1 for _ in range(len(self.thymidine_gaps))]
-                self.raw_probability_modbam_format = [-1 for _ in range(len(self.thymidine_gaps))]
+        if len(mod_data) > 1:
+            raise ValueError("It appears that there are many pieces corresponding to the same modification in a read!")
 
-            # insert zeroes for missing bases if non_na_mode_requested
-            if self.allow_non_na_mode and non_na_mode_requested and not self.force_missing:
+        elif len(mod_data) == 1:
+
+            self.raw_probability_modbam_format = mod_data[0]["prob"]
+            self.probability_modbam_format = list(map(lambda y: 1 if y >= self.threshold * 256 else 0,
+                                                      self.raw_probability_modbam_format))
+            self.thymidine_gaps = mod_data[0]["pos"]
+
+            # insert zeroes for missing bases if non na mode is allowed
+            if self.allow_non_na_mode and mod_data[0]['mode'] == '.' and not self.force_missing:
                 self.insert_zeroes_according_to_gaps()
 
             # convert gap coordinates to normal coordinates
@@ -587,7 +567,7 @@ def parse_modBAM_modification_information(input_string: str) -> list[dict]:
             n = int(x)
             assert (0 <= n <= num)
             return n
-        except (ValueError, AssertionError) as e:
+        except (ValueError, AssertionError):
             raise ValueError("Bad probability!")
 
     # Initialize the output list
