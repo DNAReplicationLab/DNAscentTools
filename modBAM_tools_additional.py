@@ -184,6 +184,8 @@ class ModBamRecordProcessor:
         seq (str): sequence of the record
         is_rev (bool): whether the record is reverse
         is_unmapped (bool): whether the record is unmapped
+        is_mod_data_on_comp_strand (bool): whether the modification data is on the strand complementary to the
+                basecalled strand or not
         fwd_seq (str): forward sequence of the record
         ref_to_query_tbl (list): list of tuples of reference and query positions calculated from cigar string
         raw_probability_modbam_format (list): entries are 0 to 255
@@ -210,6 +212,7 @@ class ModBamRecordProcessor:
     seq: str
     is_rev: bool
     is_unmapped: bool
+    is_mod_data_on_comp_strand: bool
 
     fwd_seq: str
     ref_to_query_tbl: list[tuple[int, int]]
@@ -258,6 +261,7 @@ class ModBamRecordProcessor:
         self.seq = ""
         self.is_rev = False
         self.is_unmapped = False
+        self.is_mod_data_on_comp_strand = False
 
         self.fwd_seq = ""
         self.ref_to_query_tbl = []
@@ -335,6 +339,10 @@ class ModBamRecordProcessor:
             self.probability_modbam_format = list(map(lambda y: 1 if y >= self.threshold * 256 else 0,
                                                       self.raw_probability_modbam_format))
             self.thymidine_gaps = mod_data[0]["pos"]
+            self.is_mod_data_on_comp_strand = (mod_data[0]["mod_strand"] == "-")
+
+            if self.is_mod_data_on_comp_strand:
+                raise NotImplementedError("We cannot deal with modification data on the complementary strand for now!")
 
             # insert zeroes for missing bases if non na mode is allowed
             if self.allow_non_na_mode and mod_data[0]['mode'] == '.' and not self.force_missing:
@@ -492,7 +500,7 @@ class ModBamRecordProcessor:
         return (ModBase(read_id=self.read_id, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base,
                         mod_base=self.code,
                         ref_strand='unmapped' if self.is_unmapped else ('-' if self.is_rev else '+'),
-                        mod_strand='+')
+                        mod_strand='-' if self.is_mod_data_on_comp_strand else '+')
                 for b, c, d in zip(fwd_seq_coords, ref_coords, probs))
 
     def calculate_autocorrelations(self, chunk_size: int = 10000, window_size: int = 300,
@@ -543,6 +551,160 @@ class ModBamRecordProcessor:
         return tuple((np.correlate(chunk, chunk, mode='full')[(len(chunk) - 1):(2 * len(chunk) - 1)] *
                       1 / np.linspace(len(chunk), 1, num=len(chunk))).tolist()
                      for chunk in norm_chunked_data)
+
+
+class ModBamFilterThreshold:
+    r""" Given a mod BAM line, filter it such that undesired bases (not of the specified code) or bases whose
+    modification probability falls between two thresholds are removed.
+
+    Attributes:
+        low_threshold (int): threshold below which base is regarded as unmodified, must be between 0 and 256
+        high_threshold (int): threshold above which base is regarded as modified, must be between 0 and 256
+        is_equal_threshold (bool): set the flag if low and high thresholds are equal. Then we remove only bases
+            whose code is not the specified one.
+        code (str): code of modification
+        base (str): unmodified base to be considered
+        modbam_processor (ModBamRecordProcessor): processor to process modBAM lines
+        prob (list): list of probabilities, must be between 0 and 255 (both inclusive)
+        pos (list): list of base positions in gap-notation i.e. number of bases skipped.
+            For e.g. if the sequence is "AATAATGAT" and we want to say the first and third thymidines are
+            modified with probability 50%, the pos list will be [0, 1] and the prob list will be [128, 128].
+            [0, 1] means skip 0 Ts and then skip 1 T.
+
+    Examples:
+        >>> sample_first_bam_fields = "loremipsum\t0\t*\t0\t0\t*\t*\t0\t10\tTGTGTGTGTG\t*"
+        >>> sample_line = f"{sample_first_bam_fields}\tMM:Z:T+T?,1,0,0,0;\tML:B:C,10,40,100,200\tblahblah"
+        >>> modbam_filter = ModBamFilterThreshold(0.35, 0.45, "T", "T")
+        >>> modbam_filter.process_modBAM_line(sample_line)
+        'loremipsum\t0\t*\t0\t0\t*\t*\t0\t10\tTGTGTGTGTG\t*\tblahblah\tMM:Z:T+T?,1,0,1;\tML:B:C,10,40,200'
+        >>> sample_line = f"{sample_first_bam_fields}\tMM:Z:T+TE,1,0,0,0;\tML:B:C,10,40,100,200,1,2,3,4\tblahblah"
+        >>> modbam_filter.process_modBAM_line(sample_line)
+        'loremipsum\t0\t*\t0\t0\t*\t*\t0\t10\tTGTGTGTGTG\t*\tblahblah\tMM:Z:T+T?,0,0,1,0;\tML:B:C,0,10,1,3'
+        >>> modbam_filter = ModBamFilterThreshold(0.35, 0.45, "L", "T")
+        >>> modbam_filter.process_modBAM_line(sample_line)
+        'loremipsum\t0\t*\t0\t0\t*\t*\t0\t10\tTGTGTGTGTG\t*\tblahblah'
+        >>> modbam_filter = ModBamFilterThreshold(0.45, 0.45, "T", "T")
+        >>> modbam_filter.process_modBAM_line(sample_line)
+        'loremipsum\t0\t*\t0\t0\t*\t*\t0\t10\tTGTGTGTGTG\t*\tblahblah\tMM:Z:T+T?,0,0,0,0,0;\tML:B:C,0,10,100,1,3'
+        >>> modbam_filter = ModBamFilterThreshold(0.45, 0.45, "E", "T")
+        >>> modbam_filter.process_modBAM_line(sample_line)
+        'loremipsum\t0\t*\t0\t0\t*\t*\t0\t10\tTGTGTGTGTG\t*\tblahblah\tMM:Z:T+E?,0,0,0,0,0;\tML:B:C,0,40,200,2,4'
+        >>> modbam_filter.process_modBAM_line(sample_first_bam_fields)
+        'loremipsum\t0\t*\t0\t0\t*\t*\t0\t10\tTGTGTGTGTG\t*'
+    """
+    low_threshold: int
+    high_threshold: int
+    is_equal_threshold: bool
+    code: str
+    base: str
+    modbam_processor: ModBamRecordProcessor
+    prob: list[int]
+    pos: list[int]
+
+    def __init__(self, low_threshold: float, high_threshold: float, code: str, base: str):
+        """ Initialize the instance
+
+        Args:
+            low_threshold: threshold below which base is regarded as unmodified, must be between 0 and 1
+            high_threshold: threshold above which base is regarded as modified, must be between 0 and 1
+            code: code of modification
+            base: unmodified base to be considered
+        """
+        self.low_threshold = int(low_threshold * 256)
+        self.high_threshold = int(high_threshold * 256)
+        self.is_equal_threshold = self.low_threshold == self.high_threshold
+        self.code = code
+        self.base = base
+        self.modbam_processor = ModBamRecordProcessor(0.01, self.code, base=self.base, allow_non_na_mode=True)
+        # threshold set above is unused in this function
+        self.prob = []
+        self.pos = []
+
+        # make some checks
+        assert 0 <= self.low_threshold <= 256
+        assert 0 <= self.high_threshold <= 256
+        assert self.low_threshold <= self.high_threshold
+        assert self.base in ["A", "G", "C", "T", "N"]
+
+    def process_modBAM_line(self, line: str) -> str:
+        """ Process modBAM line and return the line with the bases removed. If it's a no data line, return it as is.
+
+        Args:
+            line: input modBAM line, cannot be a header line
+
+        Returns:
+            processed modBAM line
+        """
+
+        mm_part = ""
+        ml_part = ""
+        data_count = {"ml": 0, "mm": 0}
+        output_line_parts = []
+        self.prob = []
+        self.pos = []
+
+        if line.startswith("@"):
+            # raise error if line is a header line as we cannot process it
+            raise ValueError("We cannot process header lines!")
+        else:
+            for cnt, line_part in enumerate(line.strip().split("\t")):
+                if cnt < 11:
+                    output_line_parts.append(line_part)
+                elif line_part.startswith(("MM:Z:", "Mm:Z:")):
+                    mm_part = line_part
+                    data_count["mm"] += 1
+                elif line_part.startswith(("Ml:B:C,", "ML:B:C,")):
+                    ml_part = line_part
+                    data_count["ml"] += 1
+                else:
+                    output_line_parts.append(line_part)
+
+            if data_count["mm"] == 1 and data_count["ml"] == 1:
+                # process the line
+                self.modbam_processor.process_modbam_line("\t".join(output_line_parts[0:11] + [mm_part, ml_part]))
+                self.prob = self.modbam_processor.raw_probability_modbam_format
+                self.pos = self.modbam_processor.thymidine_gaps
+
+                # remove bases outside thresholds
+                self.remove_bases_outside_thresholds()
+
+                # form the new MM and ML strings and return the line
+                if 0 < len(self.prob) == len(self.pos):
+                    mm_str = (f"MM:Z:{self.base}{'-' if self.modbam_processor.is_mod_data_on_comp_strand else '+'}"
+                              f"{self.code}?," + (",".join(map(str, self.pos))) + ";")
+                    ml_str = "ML:B:C," + ",".join(map(str, self.prob))
+                    return "\t".join(output_line_parts + [mm_str, ml_str])
+
+                elif len(self.prob) == len(self.pos) == 0:
+                    return "\t".join(output_line_parts)
+
+                else:
+                    raise ValueError("Bad line!")
+
+            elif data_count["mm"] == 0 and data_count["ml"] == 0:
+                # return original line if no modification data
+                return line.strip()
+
+            else:
+                raise ValueError("Bad line!")
+
+    def remove_bases_outside_thresholds(self):
+        """ Mark bases whose modification probabilities fall between two thresholds as missing. """
+
+        # do nothing if thresholds are equal
+        if self.is_equal_threshold:
+            return
+
+        # remove bases outside thresholds
+        N = len(self.prob)
+        removed_indices = [k for k in range(N)
+                           if self.low_threshold <= self.prob[k] <= self.high_threshold]
+
+        for k in filter(lambda x: x + 1 < N, removed_indices):
+            self.pos[k + 1] = self.pos[k] + self.pos[k + 1] + 1
+
+        self.prob = [self.prob[i] for i in range(N) if i not in removed_indices]
+        self.pos = [self.pos[i] for i in range(N) if i not in removed_indices]
 
 
 def parse_modBAM_modification_information(input_string: str) -> list[dict]:
@@ -612,7 +774,8 @@ def parse_modBAM_modification_information(input_string: str) -> list[dict]:
 
         # store modification information per modification code
         large_num = 1_000_000_000
-        for mod_code in mod_code_list:
+        n_mods = len(mod_code_list)
+        for start, mod_code in enumerate(mod_code_list):
             base = l[0][0]
             mod_strand = l[0][1]
             assert (base in ["A", "G", "C", "T", "N"])
@@ -622,10 +785,11 @@ def parse_modBAM_modification_information(input_string: str) -> list[dict]:
                            "mod_code": mod_code,
                            "mode": l[0][-1] if is_ending_with_mode else ".",
                            "pos": list(map(lambda x: int_within_num(x, large_num), l[1:])),  # large_num is arbitrary
-                           "prob": prob[cnt_prob: cnt_prob + len(l) - 1]
+                           "prob": prob[cnt_prob + start::n_mods][0: len(l) - 1]
                            })
-        cnt_prob += len(l) - 1
+        cnt_prob += (len(l) - 1) * n_mods
 
+    assert (cnt_prob == len(prob))
     return result
 
 

@@ -438,13 +438,21 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         expected_result_2 = [{"base": "T", "mod_code": 99001, "mode": ".", "mod_strand": "+",
                               "pos": [1, 0, 0], "prob": [100, 200, 100]}]
 
-        mod_information_3 = "MM:Z:T+de,1,0,0;C-h?,2,0;\tML:B:C,100,200,100,50,22"
-        expected_result_3 = [{"base": "T", "mod_code": "d", "mode": ".", "mod_strand": "+",
-                              "pos": [1, 0, 0], "prob": [100, 200, 100]},
+        mod_information_3a = "MM:Z:T+de,1,0,0;C-h?,2,0;\tML:B:C,100,200,101,40,90,120,50,22"
+        expected_result_3a = [{"base": "T", "mod_code": "d", "mode": ".", "mod_strand": "+",
+                              "pos": [1, 0, 0], "prob": [100, 101, 90]},
                              {"base": "T", "mod_code": "e", "mode": ".", "mod_strand": "+",
-                              "pos": [1, 0, 0], "prob": [100, 200, 100]},
+                              "pos": [1, 0, 0], "prob": [200, 40, 120]},
                              {"base": "C", "mod_code": "h", "mode": "?", "mod_strand": "-",
                               "pos": [2, 0], "prob": [50, 22]}]
+
+        mod_information_3b = "MM:Z:C-h?,2,0;T+de,1,0,0;\tML:B:C,100,200,101,40,90,120,50,22"
+        expected_result_3b = [{"base": "C", "mod_code": "h", "mode": "?", "mod_strand": "-",
+                               "pos": [2, 0], "prob": [100, 200]},
+                              {"base": "T", "mod_code": "d", "mode": ".", "mod_strand": "+",
+                               "pos": [1, 0, 0], "prob": [101, 90, 50]},
+                              {"base": "T", "mod_code": "e", "mode": ".", "mod_strand": "+",
+                               "pos": [1, 0, 0], "prob": [40, 120, 22]}]
 
         mod_information_4 = "MM:Z:T+d,1,0,0;\tML:B:C,100,200,100"
         expected_result_4 = [{"base": "T", "mod_code": "d", "mode": ".", "mod_strand": "+",
@@ -463,8 +471,12 @@ class TestDetectToModBAMSuite(unittest.TestCase):
             parse_modBAM_modification_information(mod_information_2)
         )
         self.assertEqual(
-            expected_result_3,
-            parse_modBAM_modification_information(mod_information_3)
+            expected_result_3a,
+            parse_modBAM_modification_information(mod_information_3a)
+        )
+        self.assertEqual(
+            expected_result_3b,
+            parse_modBAM_modification_information(mod_information_3b)
         )
         self.assertEqual(
             expected_result_4,
