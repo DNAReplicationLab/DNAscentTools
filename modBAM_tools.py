@@ -1,7 +1,10 @@
 import numpy as np
 import itertools
 import pysam
-from modBAM_tools_additional import get_raw_data_from_modBAM, ModBamRecordProcessor
+try:
+    from modBAM_tools_additional import get_raw_data_from_modBAM, ModBamRecordProcessor
+except ImportError:
+    from .modBAM_tools_additional import get_raw_data_from_modBAM, ModBamRecordProcessor
 
 
 def get_gaps_in_base_pos(pos, seq, base):
