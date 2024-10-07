@@ -468,7 +468,8 @@ class ModBamRecordProcessor:
                 read_id = self.read_id
             return f">{read_id} unmapped 0 {len(self.seq)} unstranded"
         elif self.use_xa_tag and self.is_alt_read_id:
-            return f">{self.read_id.replace('_', ' ')}"
+            read_id, contig, start, end, orn = process_detect_index(self.read_id)
+            return f">{read_id} {contig} {start} {end} {orn}"
         else:
             return f">{self.read_id} {self.contig} {self.start} {self.end} " \
                    f"{'rev' if self.is_rev else 'fwd'}"
