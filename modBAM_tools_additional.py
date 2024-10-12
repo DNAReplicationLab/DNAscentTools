@@ -1414,26 +1414,28 @@ def process_detect_index(x: str) -> tuple[str, str, int, int, str]:
 
 
 def process_fork_index(x: str, check_if_fork_within_read: bool = True) -> tuple[str, str, int, int, str, str, int, int]:
-    """ Process fork index
+    """ Process fork index. We also allow 'unmapped' although DNAscent doesn't allow this.
 
     Args:
         x: fork index
         check_if_fork_within_read: (default True) if True, check if fork coordinates are within read coordinates
 
     Returns:
-        read_id, contig, start, end, strand (=fwd or rev), fork_type (=L or R), fork_start, fork_end
+        read_id, contig, start, end, strand (=fwd or rev or unmapped), fork_type (=L or R), fork_start, fork_end
 
     Examples:
         >>> process_fork_index("mm_dummyI_dummyII_100_400000_rev_L_5000_70000")
         ('mm', 'dummyI_dummyII', 100, 400000, 'rev', 'L', 5000, 70000)
         >>> process_fork_index("mm_dummyI_1_130000_fwd_R_90000_100000")
         ('mm', 'dummyI', 1, 130000, 'fwd', 'R', 90000, 100000)
+        >>> process_fork_index("mm_dummyI_1_130000_unmapped_R_90000_100000")
+        ('mm', 'dummyI', 1, 130000, 'unmapped', 'R', 90000, 100000)
     """
     # split by underscore
     b = x.split("_")
 
     # find the index where strand information is stored
-    strand_index = [i for i, s in enumerate(b) if s in ["fwd", "rev"]][0]
+    strand_index = [i for i, s in enumerate(b) if s in ["fwd", "rev", "unmapped"]][0]
 
     # assign start, end, strand, startFork, endFork, forkType
     start = int(b[strand_index - 2])
