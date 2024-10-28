@@ -184,8 +184,6 @@ class ModBamRecordProcessor:
         seq (str): sequence of the record
         is_rev (bool): whether the record is reverse
         is_unmapped (bool): whether the record is unmapped
-        is_mod_data_on_comp_strand (bool): whether the modification data is on the strand complementary to the
-                basecalled strand or not
         fwd_seq (str): forward sequence of the record
         ref_to_query_tbl (list): list of tuples of reference and query positions calculated from cigar string
         raw_probability_modbam_format (list): entries are 0 to 255
@@ -193,6 +191,9 @@ class ModBamRecordProcessor:
         thymidine_gaps (list): entries are ints, show number of skipped thymidines.
         fwd_seq_thymidine_coordinates (list): coordinates of thymidines in forward sequence
         fwd_seq_reference_coordinates (list): coordinates of thymidines in forward sequence mapped to reference
+        _parsed_mod_info (list): parsed modification information in the format of a list of dictionaries.
+            Each entry corresponds to one type of modification and contains the keys base, mod_strand, mod_code,
+            mode, pos, prob.
     """
     threshold: float
     code: str
@@ -212,7 +213,6 @@ class ModBamRecordProcessor:
     seq: str
     is_rev: bool
     is_unmapped: bool
-    is_mod_data_on_comp_strand: bool
 
     fwd_seq: str
     ref_to_query_tbl: list[tuple[int, int]]
@@ -222,6 +222,8 @@ class ModBamRecordProcessor:
     thymidine_gaps: list[int]
     fwd_seq_thymidine_coordinates: list[int]
     fwd_seq_reference_coordinates: list[int]
+
+    _parsed_mod_info: list[dict]
 
     def __init__(self, threshold, code, use_xa_tag=False, allow_non_na_mode=False, base="T", force_missing=False):
         """Initializes the instance
@@ -261,16 +263,17 @@ class ModBamRecordProcessor:
         self.seq = ""
         self.is_rev = False
         self.is_unmapped = False
-        self.is_mod_data_on_comp_strand = False
 
         self.fwd_seq = ""
         self.ref_to_query_tbl = []
 
+        # these are fields for modification data
         self.raw_probability_modbam_format = []
         self.probability_modbam_format = []
         self.thymidine_gaps = []
         self.fwd_seq_thymidine_coordinates = []
         self.fwd_seq_reference_coordinates = []
+        self._parsed_mod_info = []
 
     def process_modbam_line(self, x) -> None:
         """Process data from one mod bam line"""
@@ -327,8 +330,19 @@ class ModBamRecordProcessor:
         else:
             self.fwd_seq = self.seq
 
-        mod_data = list(filter(lambda y: y["base"] == self.base and y["mod_code"] == self.code,
-                               parse_modBAM_modification_information(f"{mm_part}\t{ml_part}")))
+        # process modification information
+        self._parsed_mod_info = parse_modBAM_modification_information(f"{mm_part}\t{ml_part}")
+        self.process_parsed_mod_info()
+
+    def process_parsed_mod_info(self) -> None:
+        """Process parsed modification information and convert into more useful data structures."""
+
+        # check if data is available or do nothing
+        if not (self.has_read() and len(self._parsed_mod_info) > 0):
+            return
+
+        # filter out data that is not relevant to the current modification
+        mod_data = list(filter(lambda y: y["base"] == self.base and y["mod_code"] == self.code, self._parsed_mod_info))
 
         if len(mod_data) > 1:
             raise ValueError("It appears that there are many pieces corresponding to the same modification in a read!")
@@ -339,10 +353,9 @@ class ModBamRecordProcessor:
             self.probability_modbam_format = list(map(lambda y: 1 if y >= self.threshold * 256 else 0,
                                                       self.raw_probability_modbam_format))
             self.thymidine_gaps = mod_data[0]["pos"]
-            self.is_mod_data_on_comp_strand = (mod_data[0]["mod_strand"] == "-")
 
-            if self.is_mod_data_on_comp_strand:
-                raise NotImplementedError("We cannot deal with modification data on the complementary strand for now!")
+            if mod_data[0]["mod_strand"] == "-":
+                raise NotImplementedError("We cannot deal with modification data on the complementary strand!")
 
             # insert zeroes for missing bases if non na mode is allowed
             if self.allow_non_na_mode and mod_data[0]['mode'] == '.' and not self.force_missing:
@@ -372,6 +385,18 @@ class ModBamRecordProcessor:
         """Check if a read has been read by the processor"""
 
         return len(self.read_id) > 0
+
+    def change_base_and_code_and_process(self, base: str, code: str) -> None:
+        """Change base and code of the processor and process the modification data
+
+        Args:
+            base: new base
+            code: new modification code
+        """
+
+        self.base = base
+        self.code = code
+        self.process_parsed_mod_info()
 
     def count_bases(self, mask_ref_interval: tuple[int, int] = (-1, -1),
                     mask_fwd_seq_interval: tuple[int, int] = (-1, -1)) -> tuple[int, int, int]:
