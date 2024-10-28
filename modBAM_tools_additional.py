@@ -526,7 +526,7 @@ class ModBamRecordProcessor:
         return (ModBase(read_id=self.read_id, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base,
                         mod_base=self.code,
                         ref_strand='unmapped' if self.is_unmapped else ('-' if self.is_rev else '+'),
-                        mod_strand='-' if self.is_mod_data_on_comp_strand else '+')
+                        mod_strand='+')
                 for b, c, d in zip(fwd_seq_coords, ref_coords, probs))
 
     def calculate_autocorrelations(self, chunk_size: int = 10000, window_size: int = 300,
