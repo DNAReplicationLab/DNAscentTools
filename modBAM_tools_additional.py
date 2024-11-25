@@ -167,7 +167,8 @@ class ModBamRecordProcessor:
 
     Attributes:
         threshold (float): threshold above (below) which thymidine is regarded as modified (unmodified)
-        code (str): code of thymidine modification
+        code (str): code of thymidine modification. You can set a number instead of a string here; the function
+                will use the code as a number when comparing it with the code in the modBAM file.
         use_xa_tag (bool): use contents of XA tag to set read_id instead of the usual first entry
         allow_non_na_mode (bool): can interpret missing bases as "unmodified" rather than "missing" depending on tag
         base (str): unmodified base to be considered
@@ -184,6 +185,8 @@ class ModBamRecordProcessor:
         seq (str): sequence of the record
         is_rev (bool): whether the record is reverse
         is_unmapped (bool): whether the record is unmapped
+        is_mod_data_on_comp_strand (bool): whether the modification data is on the complementary strand. This is
+            not supported for now and is always set to False.
         fwd_seq (str): forward sequence of the record
         ref_to_query_tbl (list): list of tuples of reference and query positions calculated from cigar string
         raw_probability_modbam_format (list): entries are 0 to 255
@@ -213,6 +216,7 @@ class ModBamRecordProcessor:
     seq: str
     is_rev: bool
     is_unmapped: bool
+    is_mod_data_on_comp_strand: bool
 
     fwd_seq: str
     ref_to_query_tbl: list[tuple[int, int]]
@@ -230,7 +234,8 @@ class ModBamRecordProcessor:
 
         Args:
             threshold (float): defines threshold of this instance
-            code (str): defines code of this instance
+            code (str): defines code of this instance. You can use a number here; the function will use the code as a
+                number when comparing it with the code in the modBAM file.
             use_xa_tag (bool): (default False) defines use_xa_tag of this instance
             allow_non_na_mode (bool): (default False) defines allow_non_na_mode of this instance
             base (str): (default "T") defines base of this instance
@@ -245,6 +250,8 @@ class ModBamRecordProcessor:
         self.force_missing = force_missing
 
         self.delete_data()
+
+        self.is_mod_data_on_comp_strand = False # not supported for now
 
     def delete_data(self) -> None:
         """ Remove stored data (but not parameters).
@@ -342,7 +349,9 @@ class ModBamRecordProcessor:
             return
 
         # filter out data that is not relevant to the current modification
-        mod_data = list(filter(lambda y: y["base"] == self.base and y["mod_code"] == self.code, self._parsed_mod_info))
+        mod_data = list(filter(lambda y: y["base"] == self.base and
+                                         (y["mod_code"] in {int(self.code) if self.code.isdigit() else None,
+                                                            self.code}), self._parsed_mod_info))
 
         if len(mod_data) > 1:
             raise ValueError("It appears that there are many pieces corresponding to the same modification in a read!")
@@ -355,6 +364,7 @@ class ModBamRecordProcessor:
             self.thymidine_gaps = mod_data[0]["pos"]
 
             if mod_data[0]["mod_strand"] == "-":
+                self.is_mod_data_on_comp_strand = True
                 raise NotImplementedError("We cannot deal with modification data on the complementary strand!")
 
             # insert zeroes for missing bases if non na mode is allowed
