@@ -387,6 +387,8 @@ class ModBamRecordProcessor:
                 self.fwd_seq_reference_coordinates = convert_forward_seq_coordinates_to_ref_coordinates(
                     self.fwd_seq_thymidine_coordinates, self.ref_to_query_tbl,
                     self.is_rev)
+            else:
+                self.fwd_seq_reference_coordinates = [-1 for _ in self.fwd_seq_thymidine_coordinates]
 
     def has_data(self) -> bool:
         """Check if data is available"""
