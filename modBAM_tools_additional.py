@@ -253,6 +253,10 @@ class ModBamRecordProcessor:
 
         self.is_mod_data_on_comp_strand = False # not supported for now
 
+        # check that base is either A, C, G, T, or N
+        if self.base not in {"A", "C", "G", "T", "N"}:
+            raise ValueError("Base must be A, C, G, T, or N!")
+
     def delete_data(self) -> None:
         """ Remove stored data (but not parameters).
 
@@ -327,7 +331,7 @@ class ModBamRecordProcessor:
                         self.end = self.ref_to_query_tbl[-1][0]
                         assert self.end >= self.start
                 elif cnt == 9:
-                    self.seq = k
+                    self.seq = k.upper()
                     if self.seq == "*":
                         raise ValueError("We cannot deal with * sequences!")
 
@@ -376,7 +380,7 @@ class ModBamRecordProcessor:
                                                                                                self.thymidine_gaps,
                                                                                                self.base)
             # check that the positions all have the same base as the base of interest
-            assert all(self.fwd_seq[k] == self.base for k in self.fwd_seq_thymidine_coordinates)
+            assert (self.base == "N") or all(self.fwd_seq[k] == self.base for k in self.fwd_seq_thymidine_coordinates)
 
             # get reference coordinates if not unmapped
             if not self.is_unmapped:
@@ -1058,9 +1062,17 @@ def convert_gap_coordinates_to_normal_coordinates(seq: str, gaps: list[int], bas
         [0, 9]
         >>> convert_gap_coordinates_to_normal_coordinates("AGTATGGCT", [0, 1], "G")
         [1, 6]
+        >>> convert_gap_coordinates_to_normal_coordinates("AGTATGGCT", [0, 1], "N")
+        [0, 2]
     """
 
-    candidate_coordinates = [k for k in range(len(seq)) if seq[k] == base]
+    # check that the base is valid
+    if base not in ["A", "G", "C", "T", "N"]:
+        raise ValueError("Bad base!")
+    elif base == "N":
+        candidate_coordinates = list(range(len(seq)))
+    else:
+        candidate_coordinates = [k for k in range(len(seq)) if seq[k] == base]
     bases_to_retain = [m - 1 for m in accumulate(k + 1 for k in gaps)]
 
     return list(map(lambda x: candidate_coordinates[x], bases_to_retain))
