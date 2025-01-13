@@ -1437,6 +1437,14 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start, query_len=0):
         Traceback (most recent call last):
         ...
         ValueError: Invalid clip operations!
+        >>> cigar_to_ref_to_query_tbl("20I400M10S",100)
+        Traceback (most recent call last):
+        ...
+        ValueError: Invalid clip operations!
+        >>> cigar_to_ref_to_query_tbl("10H20I400M10S",100)
+        Traceback (most recent call last):
+        ...
+        ValueError: Invalid clip operations!
         >>> cigar_to_ref_to_query_tbl("20S10M40@10M",100)
         Traceback (most recent call last):
         ...
@@ -1495,12 +1503,13 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start, query_len=0):
     if 0 < query_len != query_move_count:
         raise ValueError('Cigar string too short!')
 
-    # we do an additional check which is not part of the standard SAM specification:
-    # as I and S are equivalent in this calculation, we do not want to see patterns like SI or IS,
-    # because it means that some bases are treated as soft-clipped, immediately followed by some
-    # bases treated as insertions, which looks arbitrary, and prevents us from analyzing
-    # genuine insertions. we expect that aligners will not output such patterns.
-    if bool(re.search('I[PH]*S', operations)) or bool(re.search('S[PH]*I', operations)):
+    # we do an additional check which is not a part of the standard SAM specification:
+    # - as I and S are equivalent in this function, we do not want to see patterns like SI or IS,
+    #   or CIGAR strings starting or ending with an 'I' instead of an 'S',
+    #   because it means that soft clips and insertions are treated interchangeably.
+    #   This prevents us from analyzing genuine insertions.
+    #   We expect that aligners will not output such patterns.
+    if bool(re.search('I[PH]*S|S[PH]*I|^[PH]*I|I[PH]*$', operations)):
         raise ValueError('Invalid clip operations!')
 
     return ref_q_map_tbl
