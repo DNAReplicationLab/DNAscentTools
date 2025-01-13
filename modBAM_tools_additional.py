@@ -1415,8 +1415,8 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start, query_len=0):
         [(0, 0), (100, 100)]
         >>> cigar_to_ref_to_query_tbl("21=",0)
         [(0, 0), (21, 21)]
-        >>> cigar_to_ref_to_query_tbl("42=5D7M12D",2)
-        [(2, 0), (44, 42), (49, 42), (56, 49), (68, 49)]
+        >>> cigar_to_ref_to_query_tbl("42=5D7M12D2=",2)
+        [(2, 0), (44, 42), (49, 42), (56, 49), (68, 49), (70, 51)]
         >>> cigar_to_ref_to_query_tbl("*",200)
         []
         >>> cigar_to_ref_to_query_tbl("20S10M20S",100)
@@ -1476,7 +1476,7 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start, query_len=0):
             operations += k
             if k == 'M' or k == '=' or k == 'X':
                 mov_tup = (1, 1)
-            elif k == 'D' or k == 'N':
+            elif k == 'D':
                 mov_tup = (1, 0)
             elif k == 'I' or k == 'S':
                 mov_tup = (0, 1)
@@ -1484,6 +1484,8 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start, query_len=0):
                 # mov_tup = (0,0)
                 # not gonna add redundant entries
                 continue
+            elif k == 'N':
+                raise ValueError('N is only used in mRNA-to-genome alignments and not in DNA-to-DNA alignments!')
             else:
                 raise ValueError('Invalid cigar string!')
 
@@ -1504,12 +1506,10 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start, query_len=0):
         raise ValueError('Cigar string too short!')
 
     # we do an additional check which is not a part of the standard SAM specification:
-    # - as I and S are equivalent in this function, we do not want to see patterns like SI or IS,
-    #   or CIGAR strings starting or ending with an 'I' instead of an 'S',
-    #   because it means that soft clips and insertions are treated interchangeably.
-    #   This prevents us from analyzing genuine insertions.
-    #   We expect that aligners will not output such patterns.
-    if bool(re.search('I[PH]*S|S[PH]*I|^[PH]*I|I[PH]*$', operations)):
+    # - after soft or hard clipping on either side of the sequence, there must be at least one match.
+    #   Although other patterns also make sense, this is the most direct way to output a CIGAR string.
+    #   We expect aligners to do this because it would be pretty strange if they do not.
+    if bool(re.search('^[HSP]*[IDX]+|[IDX]+[HSP]*$', operations)):
         raise ValueError('Invalid clip operations!')
 
     return ref_q_map_tbl
