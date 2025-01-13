@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import pysam
+import re
 from collections.abc import Callable, Iterable
 from collections import namedtuple
 from functools import reduce
@@ -326,14 +327,16 @@ class ModBamRecordProcessor:
                     self.cigar = k
                     if self.cigar == "*":
                         self.is_unmapped = True
-                    if not self.is_unmapped:
-                        self.ref_to_query_tbl = cigar_to_ref_to_query_tbl(self.cigar, self.start)
-                        self.end = self.ref_to_query_tbl[-1][0]
-                        assert self.end >= self.start
                 elif cnt == 9:
                     self.seq = k.upper()
                     if self.seq == "*":
                         raise ValueError("We cannot deal with * sequences!")
+
+        # parse cigar string
+        if not self.is_unmapped:
+            self.ref_to_query_tbl = cigar_to_ref_to_query_tbl(self.cigar, self.start, len(self.seq))
+            self.end = self.ref_to_query_tbl[-1][0]
+            assert self.end >= self.start
 
         # get the forward sequence
         if self.is_rev:
@@ -342,8 +345,9 @@ class ModBamRecordProcessor:
             self.fwd_seq = self.seq
 
         # process modification information
-        self._parsed_mod_info = parse_modBAM_modification_information(f"{mm_part}\t{ml_part}")
-        self.process_parsed_mod_info()
+        if len(mm_part) > 0 and len(ml_part) > 0:
+            self._parsed_mod_info = parse_modBAM_modification_information(f"{mm_part}\t{ml_part}")
+            self.process_parsed_mod_info()
 
     def process_parsed_mod_info(self) -> None:
         """Process parsed modification information and convert into more useful data structures."""
@@ -1394,12 +1398,14 @@ def modBAM_add_XP_tag(modbam_line: str) -> str:
     return modbam_line.strip() + f"\tXP:Z:plot_only_self\n"
 
 
-def cigar_to_ref_to_query_tbl(cigar_str, ref_start):
+def cigar_to_ref_to_query_tbl(cigar_str, ref_start, query_len=0):
     """Use cigar string to map query coord to ref coord
 
     Args:
         cigar_str (string): cigar string
         ref_start (int): starting position along reference
+        query_len (int): (default 0 i.e. unused) length of query sequence. If provided, we will check that the
+                         "sum of lengths of the M/I/S/=/X operations shall equal the length of SEQ".
 
     Returns:
         list of two-element tuples (ref coord, query coord)
@@ -1411,11 +1417,47 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start):
         [(0, 0), (21, 21)]
         >>> cigar_to_ref_to_query_tbl("42=5D7M12D",2)
         [(2, 0), (44, 42), (49, 42), (56, 49), (68, 49)]
+        >>> cigar_to_ref_to_query_tbl("*",200)
+        []
+        >>> cigar_to_ref_to_query_tbl("20S10M20S",100)
+        [(100, 0), (100, 20), (110, 30), (110, 50)]
+        >>> cigar_to_ref_to_query_tbl("20S10M40H",100)
+        [(100, 0), (100, 20), (110, 30)]
+        >>> cigar_to_ref_to_query_tbl("20M10S40H",100)
+        [(100, 0), (120, 20), (120, 30)]
+        >>> cigar_to_ref_to_query_tbl("20S10M40S10M",100)
+        Traceback (most recent call last):
+        ...
+        ValueError: Invalid clip operations!
+        >>> cigar_to_ref_to_query_tbl("20S10I400M",100)
+        Traceback (most recent call last):
+        ...
+        ValueError: Invalid clip operations!
+        >>> cigar_to_ref_to_query_tbl("20S400M10I1P10S",100)
+        Traceback (most recent call last):
+        ...
+        ValueError: Invalid clip operations!
+        >>> cigar_to_ref_to_query_tbl("20S10M40@10M",100)
+        Traceback (most recent call last):
+        ...
+        ValueError: Invalid cigar string!
+        >>> cigar_to_ref_to_query_tbl("20M10S40H",100, 30)
+        [(100, 0), (120, 20), (120, 30)]
+        >>> cigar_to_ref_to_query_tbl("20M10S40H",100, 29)
+        Traceback (most recent call last):
+        ...
+        ValueError: Cigar string too short!
     """
+
+    if cigar_str == "*":
+        return []
 
     latest_pair = (ref_start, 0)
     ref_q_map_tbl = [latest_pair]
     num = 0
+
+    operations = ""
+    query_move_count = 0
 
     for k in cigar_str:
         if '0' <= k <= '9':
@@ -1423,6 +1465,7 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start):
         else:
             latest_num = num
             num = 0
+            operations += k
             if k == 'M' or k == '=' or k == 'X':
                 mov_tup = (1, 1)
             elif k == 'D' or k == 'N':
@@ -1438,8 +1481,27 @@ def cigar_to_ref_to_query_tbl(cigar_str, ref_start):
 
             latest_pair = (latest_pair[0] + latest_num * mov_tup[0],
                            latest_pair[1] + latest_num * mov_tup[1])
+            query_move_count += latest_num * mov_tup[1]
 
             ref_q_map_tbl.append(latest_pair)
+
+    # - check that 'H' only occurs at the beginning or the end
+    # - in the case that 'S' is present in the operations, we have to check that there
+    #   are only H's between it and the nearest end of the cigar string
+    if not bool(re.fullmatch('^(H){0,1}(S){0,1}[M=XDNIP]*(S){0,1}(H){0,1}$', operations)):
+        raise ValueError('Invalid clip operations!')
+
+    # - check that the sum of lengths of the M/I/S/=/X operations shall equal the length of SEQ
+    if 0 < query_len != query_move_count:
+        raise ValueError('Cigar string too short!')
+
+    # we do an additional check which is not part of the standard SAM specification:
+    # as I and S are equivalent in this calculation, we do not want to see patterns like SI or IS,
+    # because it means that some bases are treated as soft-clipped, immediately followed by some
+    # bases treated as insertions, which looks arbitrary, and prevents us from analyzing
+    # genuine insertions. we expect that aligners will not output such patterns.
+    if bool(re.search('I[PH]*S', operations)) or bool(re.search('S[PH]*I', operations)):
+        raise ValueError('Invalid clip operations!')
 
     return ref_q_map_tbl
 
