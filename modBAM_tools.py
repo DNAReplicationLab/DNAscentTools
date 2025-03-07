@@ -17,6 +17,33 @@ def get_gaps_in_base_pos(pos, seq, base):
 
     Returns:
         list of ints with length 1 shy of length of pos.
+
+    Raises:
+        ValueError: If positions are not in ascending order, or if positions are inappropriate, or if positions do not match the base.
+
+    Examples:
+        >>> get_gaps_in_base_pos([1, 5], 'ATATATA', 'T')
+        [1]
+        >>> get_gaps_in_base_pos([1, 5], 'ATTTATA', 'T')
+        [2]
+        >>> get_gaps_in_base_pos([-1, 1, 5, 9, 14, 17], 'GGXXXGXXXGXXGXGXG', 'G')
+        [1, 0, 0, 1, 1]
+        >>> get_gaps_in_base_pos([1, 5, 9, 14], 'XTXXXGXXXGXXGXGXG', 'G')
+        Traceback (most recent call last):
+            ...
+        ValueError: Positions of interest must be G
+        >>> get_gaps_in_base_pos([1, 5, 9, 18], 'XGXXXGXXXGXXGXGXG', 'G')
+        Traceback (most recent call last):
+            ...
+        ValueError: Inappropriate entries
+        >>> get_gaps_in_base_pos([-2, 5, 9, 14], 'XGXXXGXXXGXXGXGXG', 'G')
+        Traceback (most recent call last):
+            ...
+        ValueError: Inappropriate entries
+        >>> get_gaps_in_base_pos([5, 1, 9, 14], 'XGXXXGXXXGXXGXGXG', 'G')
+        Traceback (most recent call last):
+            ...
+        ValueError: Positions must be in ascending order
     """
     # raise error if first and last entries are inappropriate
     if pos[0] < -1 or pos[-1] > len(seq):
@@ -45,6 +72,18 @@ def convert_data_per_T_to_modBAM_fmt(seq_data):
 
     Returns:
         list of probs scaled to 0 to 255
+
+    Examples:
+        >>> convert_data_per_T_to_modBAM_fmt([0.0, 0.5, 1.0])
+        [0, 128, 255]
+        >>> convert_data_per_T_to_modBAM_fmt([0.1, 0.2, 0.3])
+        [25, 51, 76]
+        >>> convert_data_per_T_to_modBAM_fmt([0.999, 0.001])
+        [255, 0]
+        >>> convert_data_per_T_to_modBAM_fmt([0.123, 0.456, 0.789])
+        [31, 116, 201]
+        >>> convert_data_per_T_to_modBAM_fmt([1.1, -0.1])
+        [255, 0]
     """
 
     # convert entries to integers b/w 0 and 255, both included
@@ -64,7 +103,7 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
 
     Yields:
         dict with keys readID, refContig, refStart, refEnd, strand,
-          posOnRef, probBrdU, sixMerOnRef. Meanings are as in the detect file.
+          posOnRef, probBrdU, probEdU, sixMerOnRef. Meanings are as in the detect file.
           NOTE: First-ever item has keys comments (list of str) and
             refFasta (str).
 
@@ -97,6 +136,9 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
 
         else:
 
+            is_three_line_entry = False
+            is_four_line_entry = False
+
             for line in sub_iter:
 
                 # in dnascent detect files, a few comment lines
@@ -123,16 +165,21 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
                     current_entry['posOnRef'].append(int(split_line[0]))
                     current_entry['probBrdU'].append(float(split_line[col2]))
                     current_entry['sixMerOnRef'].append(split_line[col3])
+                    is_three_line_entry = True
                 elif len(split_line) == 4:
                     current_entry['posOnRef'].append(int(split_line[0]))
                     current_entry['probEdU'].append(float(split_line[col2]))
                     current_entry['probBrdU'].append(float(split_line[col3]))
                     current_entry['sixMerOnRef'].append(split_line[3])
+                    is_four_line_entry = True
                 else:
                     continue
 
             # return current record
-            yield current_entry
+            if is_three_line_entry or is_four_line_entry:
+                yield current_entry
+            else:
+                raise ValueError("Malformed detect file")
 
 
 def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
