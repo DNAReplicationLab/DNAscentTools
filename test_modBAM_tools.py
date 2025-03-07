@@ -559,5 +559,156 @@ class TestDetectToModBAMSuite(unittest.TestCase):
         os.system("rm sample_2.*")
 
 
+class TestDetectToModBAMWithEdU(unittest.TestCase):
+    pgInfo = None
+    fakeDetect = None
+    fakeFaFile = None
+    seqContig1 = None
+    seqContig2 = None
+    seqContig3 = None
+    comments = None
+
+    @classmethod
+    def setUpClass(cls):
+        """ Make fake detect and fasta data with EdU
+
+        Returns:
+            None
+        """
+
+        cls.comments = [
+            "# dummy data adapted from dnascent docs",
+            "#Genome sample.fa",
+            "#Index dummy.index"
+        ]
+
+        cls.seqContig1 = "AGCTAGCTATCGTTTCTGTGAG"
+        cls.seqContig2 = "GGGGGGGGGGTCTCTAACGACCAAGGGGGGGGGGGGGGGGGGGGGGGG"
+        cls.seqContig3 = (
+            "CCACACCACACCCACACACCCACACATCAAATCCACACCACACCACACCC"
+            "TGGGAGCCACCATAACGGCCTTATTG"
+        )
+
+        cls.fakeDetect = (f"{cls.comments[0]}\n"
+                          f"{cls.comments[1]}\n"
+                          f"{cls.comments[2]}\n"
+                          ">5d10eb9a-aae1-4db8-8ec6-7ebb34d32575 dummyI 9 17 fwd\n"
+                          f"9\t0.017496\t0.1\t{cls.seqContig1[9:15]}\n"
+                          f"12\t0.029483\t0.2\t{cls.seqContig1[12:18]}\n"
+                          f"13\t0.039008\t0.3\t{cls.seqContig1[13:19]}\n"
+                          f"16\t0.026997\t0.4\t{cls.seqContig1[16:22]}\n"
+                          ">a4f36092-b4d5-47a9-813e-c22c3b477a0c dummyIII 23 71 fwd\n"
+                          f"26\t0.866907\t0.5\t{cls.seqContig3[26:32]}\n"
+                          f"31\t0.947935\t0.6\t{cls.seqContig3[31:37]}\n"
+                          f"50\t0.014683\t0.7\t{cls.seqContig3[50:56]}\n"
+                          f"62\t0.186812\t0.8\t{cls.seqContig3[62:68]}\n"
+                          f"70\t0.934850\t0.9\t{cls.seqContig3[70:76]}\n"
+                          ">fffffff1-10d2-49cb-8ca3-e8d48979001b dummyII 3 36 rev\n"
+                          f"10\t0.012874\t0.1\t{cls.seqContig2[10:16]}\n"
+                          f"11\t0.012428\t0.2\t{cls.seqContig2[11:17]}\n"
+                          f"14\t0.016811\t0.3\t{cls.seqContig2[14:20]}\n"
+                          f"17\t0.013372\t0.4\t{cls.seqContig2[17:23]}\n"
+                          f"18\t0.713836\t0.5\t{cls.seqContig2[18:24]}\n"
+                          )
+
+        cls.query1 = cls.seqContig1[9: 17]
+        cls.query2 = cls.seqContig2[3: 36]
+        cls.query3 = cls.seqContig3[23: 71]
+
+        cls.fakeFaFile = (">dummyI\n"
+                          f"{cls.seqContig1}\n"
+                          ">dummyII\n"
+                          f"{cls.seqContig2}\n"
+                          ">dummyIII\n"
+                          f"{cls.seqContig3[0:50]}\n"
+                          f"{cls.seqContig3[50:]}\n"
+                          )
+
+        # make fake fasta file and index it
+        with open("sample.fa", "w") as dummyFa:
+            dummyFa.write(cls.fakeFaFile)
+
+        pysam.faidx("sample.fa")
+
+        # program info
+        cls.pgInfo = {
+            'PN': 'convert_detect_to_modBAM',
+            'ID': 'convert_detect_to_modBAM',
+            'VN': 'dummyVersion'
+        }
+
+        # make modBAM file
+        convert_dnascent_detect_to_modBAM_file(
+            convert_detect_into_detect_stream(cls.fakeDetect.split("\n")),
+            'sample_with_edu.bam', '472552+472553',
+            True,
+            pg_info=cls.pgInfo)
+
+        # index file
+        pysam.index("sample_with_edu.bam")
+
+    def test_convert_detect_into_detect_stream_with_edu(self):
+        """ Test if iterating over detect records with EdU data works """
+    
+        expected_detect_stream = [
+            {
+                "comments": [
+                    "# dummy data adapted from dnascent docs",
+                    "#Genome sample.fa",
+                    "#Index dummy.index"
+                ],
+                "refFasta": "sample.fa"
+            },
+            {
+                "readID": "5d10eb9a-aae1-4db8-8ec6-7ebb34d32575",
+                "refContig": "dummyI",
+                "refStart": 9,
+                "refEnd": 17,
+                "strand": "fwd",
+                "posOnRef": [9, 12, 13, 16],
+                "probBrdU": [0.017496, 0.029483, 0.039008, 0.026997],
+                "probEdU": [0.1, 0.2, 0.3, 0.4],
+                "sixMerOnRef": ["TCGTTT", "TTTCTG", "TTCTGT", "TGTGAG"]
+            },
+            {
+                "readID": "a4f36092-b4d5-47a9-813e-c22c3b477a0c",
+                "refContig": "dummyIII",
+                "refStart": 23,
+                "refEnd": 71,
+                "strand": "fwd",
+                "posOnRef": [26, 31, 50, 62, 70],
+                "probBrdU": [0.866907, 0.947935, 0.014683, 0.186812, 0.934850],
+                "probEdU": [0.5, 0.6, 0.7, 0.8, 0.9],
+                "sixMerOnRef": ["TCAAAT", "TCCACA", "TGGGAG", "TAACGG", "TTATTG"]
+            },
+            {
+                "readID": "fffffff1-10d2-49cb-8ca3-e8d48979001b",
+                "refContig": "dummyII",
+                "refStart": 3,
+                "refEnd": 36,
+                "strand": "rev",
+                "posOnRef": [10, 11, 14, 17, 18],
+                "probBrdU": [0.012874, 0.012428, 0.016811, 0.013372, 0.713836],
+                "probEdU": [0.1, 0.2, 0.3, 0.4, 0.5],
+                "sixMerOnRef": ["TCTCTA", "CTCTAA", "TAACGA", "CGACCA", "GACCAA"]
+            }
+        ]
+    
+        self.assertEqual(
+            expected_detect_stream,
+            list(
+                convert_detect_into_detect_stream(
+                    self.fakeDetect.split("\n"), switch_2_and_3=True
+                ))
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        """ Delete some temporary files """
+        os.system("rm sample_with_edu.bam.bai")
+        os.system("rm sample_with_edu.bam")
+        os.system("rm sample.fa.fai")
+
+
 if __name__ == '__main__':
     unittest.main()
