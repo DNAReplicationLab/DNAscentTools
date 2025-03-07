@@ -8,7 +8,69 @@ from modBAM_tools import get_gaps_in_base_pos, \
     get_mod_counts_per_interval, \
     get_read_data_from_modBAM
 from modBAM_tools_additional import get_raw_data_from_modBAM, \
-    ModBamRecordProcessor, parse_modBAM_modification_information
+    ModBamRecordProcessor, parse_modBAM_modification_information, \
+    convert_bed_to_detect_stream
+
+
+class TestConvertBedToDetectStream(unittest.TestCase):
+
+    def setUp(self):
+        """
+        Set up the test environment by creating a temporary BED file.
+        This method creates a BED file with the following content:
+        # BED file content:
+        # sample comment
+        track something
+        chr1    100    101    name1    0.5    +
+        chr1    150    151    name1    0.7    +
+        chr1    200    201    name2    0.9    -
+        chr1    250    251    name2    0.8    -
+        The file is saved as 'test.bed' in the current directory.
+        """
+        self.bed_file_content = (
+            "# sample comment\n"
+            "track something\n"
+            "chr1\t100\t101\tname1\t0.5\t+\n"
+            "chr1\t150\t151\tname1\t0.7\t+\n"
+            "chr1\t200\t201\tname2\t0.9\t-\n"
+            "chr1\t250\t251\tname2\t0.8\t-\n"
+        )
+        self.bed_file_path = "test.bed"
+        with open(self.bed_file_path, "w") as bed_file:
+            bed_file.write(self.bed_file_content)
+
+    def tearDown(self):
+        """ Remove the temporary BED file """
+        os.remove(self.bed_file_path)
+
+    def test_convert_bed_to_detect_stream(self):
+        """ Test the convert_bed_to_detect_stream function """
+        expected_output = [
+            {"comments": "converted from bed file test.bed"},
+            {
+                "readID": "name1",
+                "refContig": "chr1",
+                "refStart": 100,
+                "refEnd": 151,
+                "strand": "+",
+                "posOnRef": [100, 150],
+                "probBrdU": [0.5, 0.7],
+                "sixMerOnRef": ["NNNNNN", "NNNNNN"]
+            },
+            {
+                "readID": "name2",
+                "refContig": "chr1",
+                "refStart": 200,
+                "refEnd": 251,
+                "strand": "-",
+                "posOnRef": [200, 250],
+                "probBrdU": [0.9, 0.8],
+                "sixMerOnRef": ["NNNNNN", "NNNNNN"]
+            }
+        ]
+
+        result = convert_bed_to_detect_stream(self.bed_file_path)
+        self.assertEqual(result, expected_output)
 
 
 class TestDetectToModBAMSuite(unittest.TestCase):

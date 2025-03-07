@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import pysam
+import csv
 import re
 from collections.abc import Callable, Iterable
 from collections import namedtuple
@@ -1190,6 +1191,62 @@ def modBAM_record_to_detect(modbam_line: str, fasta_file_name: str = "", reverse
     ) for k in filter(lambda x: x[0] != -1, zip(thymidine_pos_normal_format, probability_normal_format)))
 
     return mod_bam_record.detect_header(is_unmapped_mode) + ("\n" + detect_body if detect_body else "")
+
+
+def convert_bed_to_detect_stream(bed_file: str) -> list[dict]:
+    r""" Convert bed file to detect stream.
+    Each line in a bed file must have at least six columns of contig, start, end, name, score, strand
+    where score has the modification probability or some equivalent information.
+    We group data by name, and produce one dictionary per name containing the keys readID, refContig, refStart,
+    refEnd, strand, posOnRef, probBrdU, sixMerOnRef. readID, refContig, and strand are self-explanatory.
+    refStart is the minimum start position, refEnd is the maximum start position plus one,
+    posOnRef is the list of start positions, probBrdU is the list of scores, and sixMerOnRef is the list of sixmers,
+    all of which are set to "NNNNNN".
+    The first dictionary in the list contains the key comments with the value "converted from bed file {bed_file}".
+    This is our detectStream format.
+    Each row in the BED file must be such that start = end or start = end - 1 otherwise you will get an error.
+
+    Args:
+        bed_file: path to bed file
+
+    Returns:
+        list of dictionaries (see above)
+    """
+    bed_stream = {}
+    
+    with open(bed_file, 'r') as file:
+        reader = csv.reader(file, delimiter='\t')
+        for row in filter(lambda x: not x[0].startswith(('#', 'track', 'browser')), reader):
+            if len(row) < 6:
+                raise ValueError("Each line in the BED file must have at least six columns.")
+            
+            contig, start, end, name, score, strand = row[:6]
+            start, end = int(start), int(end)
+            score = float(score)
+            
+            if start != end and start != end - 1:
+                raise ValueError("Each row in the BED file must be such that start = end or start = end - 1.")
+            
+            if name not in bed_stream:
+                bed_stream[name] = {
+                    'readID': name,
+                    'refContig': contig,
+                    'refStart': start,
+                    'refEnd': end,
+                    'strand': strand,
+                    'posOnRef': [],
+                    'probBrdU': [],
+                    'sixMerOnRef': []
+                }
+            else:
+                bed_stream[name]['refStart'] = min(bed_stream[name]['refStart'], start)
+                bed_stream[name]['refEnd'] = max(bed_stream[name]['refEnd'], end)
+            
+            bed_stream[name]['posOnRef'].append(start)
+            bed_stream[name]['probBrdU'].append(score)
+            bed_stream[name]['sixMerOnRef'].append("NNNNNN")
+    
+    return [{"comments": f"converted from bed file {bed_file}"}] + list(bed_stream.values())
 
 
 def modBAM_record_windowed_average(modbam_line: str, window_size: int = 0, threshold: float = 0.5,
