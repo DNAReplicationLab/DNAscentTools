@@ -138,6 +138,7 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
 
             is_three_line_entry = False
             is_four_line_entry = False
+            is_comment = False
 
             for line in sub_iter:
 
@@ -148,6 +149,7 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
                 if line.startswith('#'):
 
                     # store comments
+                    is_comment = True
                     current_entry["comments"].append(line.rstrip())
 
                     # record fasta reference file
@@ -176,7 +178,7 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
                     continue
 
             # return current record
-            if is_three_line_entry or is_four_line_entry:
+            if is_three_line_entry or is_four_line_entry or is_comment:
                 yield current_entry
             else:
                 raise ValueError("Malformed detect file")
