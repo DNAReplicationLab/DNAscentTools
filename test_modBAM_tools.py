@@ -46,15 +46,16 @@ class TestConvertBedToDetectStream(unittest.TestCase):
     def test_convert_bed_to_detect_stream(self):
         """ Test the convert_bed_to_detect_stream function """
         expected_output = [
-            {"comments": "converted from bed file test.bed"},
+            {"comments": ["converted from bed file test.bed"]},
             {
                 "readID": "name1",
                 "refContig": "chr1",
                 "refStart": 100,
                 "refEnd": 151,
-                "strand": "+",
+                "strand": "fwd",
                 "posOnRef": [100, 150],
                 "probBrdU": [0.5, 0.7],
+                'probEdU': [],
                 "sixMerOnRef": ["NNNNNN", "NNNNNN"]
             },
             {
@@ -62,9 +63,10 @@ class TestConvertBedToDetectStream(unittest.TestCase):
                 "refContig": "chr1",
                 "refStart": 200,
                 "refEnd": 251,
-                "strand": "-",
+                "strand": "rev",
                 "posOnRef": [200, 250],
                 "probBrdU": [0.9, 0.8],
+                'probEdU': [],
                 "sixMerOnRef": ["NNNNNN", "NNNNNN"]
             }
         ]

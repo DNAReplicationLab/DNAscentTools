@@ -1201,10 +1201,10 @@ def convert_bed_to_detect_stream(bed_file: str) -> list[dict]:
     refEnd, strand, posOnRef, probBrdU, sixMerOnRef. readID, refContig, and strand are self-explanatory.
     refStart is the minimum start position, refEnd is the maximum start position plus one,
     posOnRef is the list of start positions, probBrdU is the list of scores, and sixMerOnRef is the list of sixmers,
-    all of which are set to "NNNNNN".
+    all of which are set to "NNNNNN". probEdU is not used in this function and is set to an empty list.
     The first dictionary in the list contains the key comments with the value "converted from bed file {bed_file}".
     This is our detectStream format.
-    Each row in the BED file must be such that start = end or start = end - 1 otherwise you will get an error.
+    Each row in the BED file must be such that start = end - 1 otherwise you will get an error.
 
     Args:
         bed_file: path to bed file
@@ -1224,8 +1224,11 @@ def convert_bed_to_detect_stream(bed_file: str) -> list[dict]:
             start, end = int(start), int(end)
             score = float(score)
             
-            if start != end and start != end - 1:
-                raise ValueError("Each row in the BED file must be such that start = end or start = end - 1.")
+            if start != end - 1:
+                raise ValueError("Each row in the BED file must be such that start = end - 1.")
+            
+            if strand not in ["+", "-"]:
+                raise ValueError("Strand must be either + or -.")
             
             if name not in bed_stream:
                 bed_stream[name] = {
@@ -1233,8 +1236,9 @@ def convert_bed_to_detect_stream(bed_file: str) -> list[dict]:
                     'refContig': contig,
                     'refStart': start,
                     'refEnd': end,
-                    'strand': strand,
+                    'strand': "fwd" if strand == "+" else "rev",
                     'posOnRef': [],
+                    'probEdU': [],
                     'probBrdU': [],
                     'sixMerOnRef': []
                 }
@@ -1246,7 +1250,7 @@ def convert_bed_to_detect_stream(bed_file: str) -> list[dict]:
             bed_stream[name]['probBrdU'].append(score)
             bed_stream[name]['sixMerOnRef'].append("NNNNNN")
     
-    return [{"comments": f"converted from bed file {bed_file}"}] + list(bed_stream.values())
+    return [{"comments": [f"converted from bed file {bed_file}"]}] + list(bed_stream.values())
 
 
 def modBAM_record_windowed_average(modbam_line: str, window_size: int = 0, threshold: float = 0.5,

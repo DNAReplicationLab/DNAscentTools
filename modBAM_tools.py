@@ -137,7 +137,7 @@ def convert_detect_into_detect_stream(detect_obj, switch_2_and_3=False):
 
 def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
                                            code="472552", bam_file=True, shift_rev_strand_pos=5, pg_info=None,
-                                           fasta=""):
+                                           fasta="", base='T'):
     """ Convert dnascent detect data to modBAM format
 
     NOTE: About dnascent reverse offset issue and the param shift_rev_strand_pos.
@@ -177,6 +177,7 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
           have key 'ID'.
         fasta (str): (default ""). If supplied, this reference genome overrides
           reference genome in detect file
+        base (str): (default 'T'). Base that is modified.
 
     Returns:
         None
@@ -276,7 +277,7 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
             thym_coords = list(itertools.chain([-1], rel_pos))
 
             gaps_in_t = get_gaps_in_base_pos(thym_coords,
-                                             seg.get_forward_sequence(), 'T')
+                                             seg.get_forward_sequence(), base)
 
             str_gaps_in_t = ",".join(str(int(k)) for k in gaps_in_t)
 
@@ -289,12 +290,12 @@ def convert_dnascent_detect_to_modBAM_file(detect_stream, filename,
             # check if multiple analogues are used
             if '+' not in code:
                 if len(oneDetect['probEdU']) == 0:
-                    seg.set_tag("MM", f"T+{code}?,{str_gaps_in_t};", "Z")
+                    seg.set_tag("MM", f"{base}+{code}?,{str_gaps_in_t};", "Z")
                 else:
                     raise ValueError('Please specify two codes if using a two-analogue version of DNAscent')
             else:
                 code_1, code_2 = fn_rev_if_needed(code.split('+'))
-                seg.set_tag("MM", f"T+{code_1}?,{str_gaps_in_t};" + f"T+{code_2}?,{str_gaps_in_t};", "Z")
+                seg.set_tag("MM", f"{base}+{code_1}?,{str_gaps_in_t};" + f"{base}+{code_2}?,{str_gaps_in_t};", "Z")
 
             seg.set_tag("ML", list(fn_rev_if_needed(prob_frm0_to255)))
             seg.set_tag("XR", uuid_first7_char_to_int(oneDetect['readID']), "i")
