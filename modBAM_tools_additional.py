@@ -302,8 +302,12 @@ class ModBamRecordProcessor:
 
             if cnt >= 11 and k.startswith(("MM:Z:", "Mm:Z:")):
                 mm_part = k
+                # if an MM tag does not have an associated ML tag, we just ignore it.
             elif cnt >= 11 and k.startswith(("Ml:B:C,", "ML:B:C,")):
                 ml_part = k
+                self._parsed_mod_info += parse_modBAM_modification_information(f"{mm_part}\t{ml_part}")
+                mm_part = ""
+                ml_part = ""
             elif cnt == 0:
                 self.read_id = k
             elif (not (cnt == 0 or self.is_unmapped)) and k.startswith("XA:Z:") and self.use_xa_tag:
@@ -346,9 +350,7 @@ class ModBamRecordProcessor:
             self.fwd_seq = self.seq
 
         # process modification information
-        if len(mm_part) > 0 and len(ml_part) > 0:
-            self._parsed_mod_info = parse_modBAM_modification_information(f"{mm_part}\t{ml_part}")
-            self.process_parsed_mod_info()
+        self.process_parsed_mod_info()
 
     def process_parsed_mod_info(self) -> None:
         """Process parsed modification information and convert into more useful data structures."""
