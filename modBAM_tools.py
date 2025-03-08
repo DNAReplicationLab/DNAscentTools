@@ -421,7 +421,8 @@ def get_mod_counts_per_interval(mod_bam_file, intervals, base,
 
 
 def get_read_data_from_modBAM(mod_bam_file: str, read_id: str,
-                              contig: str, start: int, end: int):
+                              contig: str, start: int, end: int,
+                              base: str = 'T', code: str = 'T'):
     """ Get modification probabilities corresponding to coords on a read
 
     Args:
@@ -430,11 +431,13 @@ def get_read_data_from_modBAM(mod_bam_file: str, read_id: str,
         contig: contig on reference genome
         start: start pos on ref genome, 0-based
         end: end pos on ref genome, 0-based
+        base: base of interest that has been modified
+        code: modification code
 
     Returns:
         Iterator w each entry = (ref pos, probability)
     """
 
     return map(lambda x: (x[1], x[2]), get_raw_data_from_modBAM(mod_bam_file, contig, start, end,
-                                                                base='T', code='T', read_id=read_id,
+                                                                base=base, code=code, read_id=read_id,
                                                                 allow_multiple_entries_input_read_id=False))

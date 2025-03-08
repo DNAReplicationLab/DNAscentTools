@@ -702,6 +702,52 @@ class TestDetectToModBAMWithEdU(unittest.TestCase):
                 ))
         )
 
+    def test_modBAM_retrieval_brdu(self):
+        """ Test retrieval of data from modbam file """
+
+        # get read data and compare to expectation
+        positions = []
+        probabilities = []
+        for k in get_read_data_from_modBAM(
+                "sample_with_edu.bam",
+                "5d10eb9a-aae1-4db8-8ec6-7ebb34d32575",
+                "dummyI",
+                9,
+                17,
+                "T",
+                "472552"
+        ):
+            positions.append(k[0])
+            probabilities.append(k[1])
+
+        self.assertEqual(positions, [9, 12, 13, 16])
+
+        for entries in zip(probabilities, [0.017496, 0.029483, 0.039008, 0.026997]):
+            self.assertAlmostEqual(entries[0], entries[1], delta=1 / 256)
+
+    def test_modBAM_retrieval_edu(self):
+        """ Test retrieval of data from modbam file """
+
+        # get read data and compare to expectation
+        positions = []
+        probabilities = []
+        for k in get_read_data_from_modBAM(
+                "sample_with_edu.bam",
+                "5d10eb9a-aae1-4db8-8ec6-7ebb34d32575",
+                "dummyI",
+                9,
+                17,
+                "T",
+                "472553"
+        ):
+            positions.append(k[0])
+            probabilities.append(k[1])
+
+        self.assertEqual(positions, [9, 12, 13, 16])
+
+        for entries in zip(probabilities, [0.1, 0.2, 0.3, 0.4]):
+            self.assertAlmostEqual(entries[0], entries[1], delta=1 / 256)
+
     @classmethod
     def tearDownClass(cls):
         """ Delete some temporary files """
