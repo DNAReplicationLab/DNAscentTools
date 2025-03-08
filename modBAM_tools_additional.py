@@ -995,7 +995,8 @@ def get_mod_mean_per_read_per_interval(mod_bam_file: str, contig: str, start: in
 def get_raw_data_from_modBAM(mod_bam_file: str, contig: str, start: int, end: int,
                              base: str = 'T', code: str = 'T',
                              read_id: str = '',
-                             allow_multiple_entries_input_read_id: bool = False) -> Iterable[tuple[str, int, float]]:
+                             allow_multiple_entries_input_read_id: bool = False,
+                             report_fwd_seq_coords: bool = False) -> Iterable[tuple[str, int, float]]:
     """ Gets modification probabilities from coords in interval on all reads 
 
     Args:
@@ -1009,6 +1010,9 @@ def get_raw_data_from_modBAM(mod_bam_file: str, contig: str, start: int, end: in
         allow_multiple_entries_input_read_id: (default False) if True, allow multiple entries for the given input
                                               read id e.g. multiple alignments for a read id that map to the same
                                               region on the reference genome.
+        report_fwd_seq_coords: (default False) if True, report forward sequence coordinates instead of reference
+                               coordinates. fwd-seq means basecalled sequence, not reference sequence and the direction
+                               of coordinates is parallel to basecalled sequence irrespective of fwd/rev alignment.
 
     Returns:
         Iterator w each entry = (read id, ref position, probability)
@@ -1021,6 +1025,31 @@ def get_raw_data_from_modBAM(mod_bam_file: str, contig: str, start: int, end: in
         ('5d10eb9a-aae1-4db8-8ec6-7ebb34d32575', 9, 0.017578125)
         >>> output[1]
         ('5d10eb9a-aae1-4db8-8ec6-7ebb34d32575', 12, 0.029296875)
+        >>> output = list(get_raw_data_from_modBAM("sample.bam", "dummyI", 9, 13, report_fwd_seq_coords=True))
+        >>> len(output)
+        2
+        >>> output[0]
+        ('5d10eb9a-aae1-4db8-8ec6-7ebb34d32575', 0, 0.017578125)
+        >>> output[1]
+        ('5d10eb9a-aae1-4db8-8ec6-7ebb34d32575', 3, 0.029296875)
+        >>> output = list(get_raw_data_from_modBAM("sample.bam", "dummyII", 14, 20))
+        >>> len(output)
+        3
+        >>> output[0]
+        ('fffffff1-10d2-49cb-8ca3-e8d48979001b', 15, 0.013671875)
+        >>> output[1]
+        ('fffffff1-10d2-49cb-8ca3-e8d48979001b', 16, 0.013671875)
+        >>> output[2]
+        ('fffffff1-10d2-49cb-8ca3-e8d48979001b', 19, 0.017578125)
+        >>> output = list(get_raw_data_from_modBAM("sample.bam", "dummyII", 14, 20, report_fwd_seq_coords=True))
+        >>> len(output)
+        3
+        >>> output[0]
+        ('fffffff1-10d2-49cb-8ca3-e8d48979001b', 16, 0.017578125)
+        >>> output[1]
+        ('fffffff1-10d2-49cb-8ca3-e8d48979001b', 19, 0.013671875)
+        >>> output[2]
+        ('fffffff1-10d2-49cb-8ca3-e8d48979001b', 20, 0.013671875)
     """
 
     # find relevant records and return data
@@ -1043,8 +1072,9 @@ def get_raw_data_from_modBAM(mod_bam_file: str, contig: str, start: int, end: in
                 mod_bam_parser.process_modbam_line(x)
                 if mod_bam_parser.has_data():
                     for k in filter(lambda y: start <= y.ref_pos < end,
-                                    mod_bam_parser.mod_data_to_table(move_parallel_top_ref_strand=True)):
-                        yield k.read_id, k.ref_pos, k.mod_qual
+                                    mod_bam_parser.mod_data_to_table(move_parallel_top_ref_strand=
+                                                                     not report_fwd_seq_coords)):
+                        yield k.read_id, k.ref_pos if not report_fwd_seq_coords else k.fwd_seq_pos, k.mod_qual
     else:
         return iter([])
 

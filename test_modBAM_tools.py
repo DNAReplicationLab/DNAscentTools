@@ -554,7 +554,6 @@ class TestDetectToModBAMSuite(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         """ Delete some temporary files """
-        os.system("rm sample.bam.bai")
         os.system("rm sample.fa.fai")
         os.system("rm sample_2.*")
 
