@@ -253,7 +253,7 @@ class ModBamRecordProcessor:
 
         self.delete_data()
 
-        self.is_mod_data_on_comp_strand = False # not supported for now
+        self.is_mod_data_on_comp_strand = False  # not supported for now
 
         # check that base is either A, C, G, T, or N
         if self.base not in {"A", "C", "G", "T", "N"}:
@@ -295,7 +295,6 @@ class ModBamRecordProcessor:
         self.delete_data()
 
         # variables to receive data from mod bam line
-        ml_part = ""
         mm_part = ""
 
         for cnt, k in zip(count(), x.strip().split("\t")):
@@ -304,10 +303,8 @@ class ModBamRecordProcessor:
                 mm_part = k
                 # if an MM tag does not have an associated ML tag, we just ignore it.
             elif cnt >= 11 and k.startswith(("Ml:B:C,", "ML:B:C,")):
-                ml_part = k
-                self._parsed_mod_info += parse_modBAM_modification_information(f"{mm_part}\t{ml_part}")
+                self._parsed_mod_info += parse_modBAM_modification_information(f"{mm_part}\t{k}")
                 mm_part = ""
-                ml_part = ""
             elif cnt == 0:
                 self.read_id = k
             elif (not (cnt == 0 or self.is_unmapped)) and k.startswith("XA:Z:") and self.use_xa_tag:
@@ -352,6 +349,90 @@ class ModBamRecordProcessor:
         # process modification information
         self.process_parsed_mod_info()
 
+    def is_same_mod(self, base: str, mod_code: str, mod_strand: str) -> bool:
+        """Check if the base, mod_code, and mod_strand match the current processor's parameters.
+
+        Args:
+            base: base to check
+            mod_code: modification code to check
+            mod_strand: modification strand to check
+
+        Returns:
+            True if the base, mod_code, and mod_strand match the current processor's parameters, False otherwise.
+
+        Raises:
+            ValueError: if mod_strand is not "+" or "-" or if the base of interest is on the complementary strand
+                        because we cannot deal with that right now.
+
+        Examples:
+            >>> processor = ModBamRecordProcessor(0.5, "c", base="C")
+            >>> processor.is_same_mod("C", "c", "+")
+            True
+            >>> processor.is_same_mod("C", "m", "+")
+            False
+            >>> processor.is_same_mod("C", "c", "-")
+            False
+            >>> processor.is_same_mod("T", "c", "+")
+            False
+            >>> processor.is_same_mod("C", "76793", "+")
+            True
+            >>> processor = ModBamRecordProcessor(0.5, "T")
+            >>> processor.is_same_mod("T", "T", "+")
+            True
+            >>> processor.is_same_mod("T", "T", "-")
+            False
+            >>> processor.is_same_mod("A", "T", "-")
+            Traceback (most recent call last):
+            ...
+            ValueError: Cannot deal with modification data on the complementary strand!
+            >>> processor.is_same_mod("A", "T", ".")
+            Traceback (most recent call last):
+            ...
+            ValueError: Mod strand must be either + or -!
+        """
+
+        # complementary base dictionary
+        complementary_bases = {"A": "T", "T": "A", "C": "G", "G": "C", "N": "N"}
+
+        # make list of interchangeable mod codes from https://samtools.github.io/hts-specs/SAMtags.pdf
+        interchangeable_codes = {
+            ('C', 'm'): ('C', '27551'),
+            ('C', 'h'): ('C', '76792'),
+            ('C', 'f'): ('C', '76794'),
+            ('C', 'c'): ('C', '76793'),
+            ('T', 'g'): ('T', '16964'),
+            ('T', 'e'): ('T', '80961'),
+            ('T', 'b'): ('T', '17477'),
+            ('A', 'a'): ('A', '28871'),
+            ('G', 'o'): ('G', '44605'),
+            ('N', 'n'): ('N', '18107')
+        }
+
+        # except for 'N', 'n', add the complementary base listing to the dictionary as well
+        for k, v in list(interchangeable_codes.items()):
+            if k[0] != 'N' and k[1] != 'n':
+                interchangeable_codes[(complementary_bases[k[0]], k[1])] = (complementary_bases[v[0]], v[1])
+
+        # now, add the opposite codes to the dictionary as well
+        for k, v in list(interchangeable_codes.items()):
+            interchangeable_codes[(v[0], v[1])] = k
+
+        # check if the modification code matches
+        is_mod_code_match = (str(self.code) == str(mod_code) or
+                             ((self.base, str(self.code)) in interchangeable_codes and
+                              interchangeable_codes[(self.base, str(self.code))] == (base, str(mod_code))))
+
+        # raise error if minus strand detected with the complementary base
+        if mod_strand == "-":
+            if base == complementary_bases[self.base] and is_mod_code_match:
+                raise ValueError("Cannot deal with modification data on the complementary strand!")
+            else:
+                return False
+        elif mod_strand == "+":
+            return self.base == base and is_mod_code_match
+        else:
+            raise ValueError("Mod strand must be either + or -!")
+
     def process_parsed_mod_info(self) -> None:
         """Process parsed modification information and convert into more useful data structures."""
 
@@ -360,9 +441,8 @@ class ModBamRecordProcessor:
             return
 
         # filter out data that is not relevant to the current modification
-        mod_data = list(filter(lambda y: y["base"] == self.base and
-                                         (y["mod_code"] in {int(self.code) if self.code.isdigit() else None,
-                                                            self.code}), self._parsed_mod_info))
+        mod_data = list(filter(lambda y: self.is_same_mod(y["base"], str(y["mod_code"]), y["mod_strand"]),
+                               self._parsed_mod_info))
 
         if len(mod_data) > 1:
             raise ValueError("It appears that there are many pieces corresponding to the same modification in a read!")
@@ -1245,23 +1325,23 @@ def convert_bed_to_detect_stream(bed_file: str) -> list[dict]:
         list of dictionaries (see above)
     """
     bed_stream = {}
-    
+
     with open(bed_file, 'r') as file:
         reader = csv.reader(file, delimiter='\t')
         for row in filter(lambda x: not x[0].startswith(('#', 'track', 'browser')), reader):
             if len(row) < 6:
                 raise ValueError("Each line in the BED file must have at least six columns.")
-            
+
             contig, start, end, name, score, strand = row[:6]
             start, end = int(start), int(end)
             score = float(score)
-            
+
             if start != end - 1:
                 raise ValueError("Each row in the BED file must be such that start = end - 1.")
-            
+
             if strand not in ["+", "-"]:
                 raise ValueError("Strand must be either + or -.")
-            
+
             if name not in bed_stream:
                 bed_stream[name] = {
                     'readID': name,
@@ -1277,11 +1357,11 @@ def convert_bed_to_detect_stream(bed_file: str) -> list[dict]:
             else:
                 bed_stream[name]['refStart'] = min(bed_stream[name]['refStart'], start)
                 bed_stream[name]['refEnd'] = max(bed_stream[name]['refEnd'], end)
-            
+
             bed_stream[name]['posOnRef'].append(start)
             bed_stream[name]['probBrdU'].append(score)
             bed_stream[name]['sixMerOnRef'].append("NNNNNN")
-    
+
     return [{"comments": [f"converted from bed file {bed_file}"]}] + list(bed_stream.values())
 
 
