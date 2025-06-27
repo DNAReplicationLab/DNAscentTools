@@ -15,6 +15,31 @@ ModBase = namedtuple('ModBase', (
 
 # above tuple based on the class ModInfo of the now un-maintained modbampy package
 
+def complement_base(base: str) -> str:
+    """Return complementary base for given base.
+
+    Args:
+        base: base to complement
+
+    Returns:
+        complementary base
+
+    Raises:
+        ValueError: if base is not A, C, G, T, or N
+    """
+    if base == "A":
+        return "T"
+    elif base == "T":
+        return "A"
+    elif base == "C":
+        return "G"
+    elif base == "G":
+        return "C"
+    elif base == "N":
+        return "N"
+    else:
+        raise ValueError("Base must be A, C, G, T, or N!")
+
 
 class HeaderLines:
     """ Class to store and manipulate header lines of BAM/modBAM file """
@@ -384,15 +409,12 @@ class ModBamRecordProcessor:
             >>> processor.is_same_mod("A", "T", "-")
             Traceback (most recent call last):
             ...
-            ValueError: Cannot deal with modification data on the complementary strand!
+            NotImplementedError: Cannot deal with modification data on the complementary strand!
             >>> processor.is_same_mod("A", "T", ".")
             Traceback (most recent call last):
             ...
             ValueError: Mod strand must be either + or -!
         """
-
-        # complementary base dictionary
-        complementary_bases = {"A": "T", "T": "A", "C": "G", "G": "C", "N": "N"}
 
         # make list of interchangeable mod codes from https://samtools.github.io/hts-specs/SAMtags.pdf
         interchangeable_codes = {
@@ -411,7 +433,7 @@ class ModBamRecordProcessor:
         # except for 'N', 'n', add the complementary base listing to the dictionary as well
         for k, v in list(interchangeable_codes.items()):
             if k[0] != 'N' and k[1] != 'n':
-                interchangeable_codes[(complementary_bases[k[0]], k[1])] = (complementary_bases[v[0]], v[1])
+                interchangeable_codes[(complement_base(k[0]), k[1])] = (complement_base(v[0]), v[1])
 
         # now, add the opposite codes to the dictionary as well
         for k, v in list(interchangeable_codes.items()):
@@ -424,8 +446,8 @@ class ModBamRecordProcessor:
 
         # raise error if minus strand detected with the complementary base
         if mod_strand == "-":
-            if base == complementary_bases[self.base] and is_mod_code_match:
-                raise ValueError("Cannot deal with modification data on the complementary strand!")
+            if base == complement_base(self.base) and is_mod_code_match:
+                raise NotImplementedError("Cannot deal with modification data on the complementary strand!")
             else:
                 return False
         elif mod_strand == "+":
@@ -463,11 +485,17 @@ class ModBamRecordProcessor:
                 self.insert_zeroes_according_to_gaps()
 
             # convert gap coordinates to normal coordinates
-            self.fwd_seq_thymidine_coordinates = convert_gap_coordinates_to_normal_coordinates(self.fwd_seq,
-                                                                                               self.thymidine_gaps,
-                                                                                               self.base)
+            self.fwd_seq_thymidine_coordinates = \
+                convert_gap_coordinates_to_normal_coordinates(self.fwd_seq,
+                                                              self.thymidine_gaps,
+                                                              self.base if not self.is_mod_data_on_comp_strand
+                                                              else complement_base(self.base))
             # check that the positions all have the same base as the base of interest
-            assert (self.base == "N") or all(self.fwd_seq[k] == self.base for k in self.fwd_seq_thymidine_coordinates)
+            assert ((self.base == "N") or
+                    (all(self.fwd_seq[k] == self.base for k in self.fwd_seq_thymidine_coordinates) and
+                     not self.is_mod_data_on_comp_strand) or
+                    (all(self.fwd_seq[k] == complement_base(self.base) for k in self.fwd_seq_thymidine_coordinates) and
+                     self.is_mod_data_on_comp_strand))
 
             # get reference coordinates if not unmapped
             if not self.is_unmapped:
@@ -562,8 +590,14 @@ class ModBamRecordProcessor:
         if not self.has_data():
             raise ValueError("No data available!")
 
-        # first, we account for implicit skips
-        num_end_insertions = (len([k for k in self.fwd_seq if k == self.base]) - sum(self.thymidine_gaps)
+        # firstly, change base if data is on the complementary strand
+        if self.is_mod_data_on_comp_strand:
+            base_of_interest = complement_base(self.base)
+        else:
+            base_of_interest = self.base
+
+        # we account for implicit skips
+        num_end_insertions = (len([k for k in self.fwd_seq if k == base_of_interest]) - sum(self.thymidine_gaps)
                               - len(self.thymidine_gaps))
 
         # find positions where we need to insert zeroes and insert them.
@@ -629,7 +663,7 @@ class ModBamRecordProcessor:
         return (ModBase(read_id=self.read_id, fwd_seq_pos=b, ref_pos=c, mod_qual=d, can_base=self.base,
                         mod_base=self.code,
                         ref_strand='unmapped' if self.is_unmapped else ('-' if self.is_rev else '+'),
-                        mod_strand='+')
+                        mod_strand='+' if not self.is_mod_data_on_comp_strand else '-')
                 for b, c, d in zip(fwd_seq_coords, ref_coords, probs))
 
     def calculate_autocorrelations(self, chunk_size: int = 10000, window_size: int = 300,
@@ -793,6 +827,9 @@ class ModBamFilterThreshold:
                 self.modbam_processor.process_modbam_line("\t".join(output_line_parts[0:11] + [mm_part, ml_part]))
                 self.prob = self.modbam_processor.raw_probability_modbam_format
                 self.pos = self.modbam_processor.thymidine_gaps
+
+                if self.modbam_processor.is_mod_data_on_comp_strand:
+                    raise NotImplementedError("We cannot deal with modification data on the complementary strand!")
 
                 # remove bases outside thresholds
                 self.remove_bases_outside_thresholds()
