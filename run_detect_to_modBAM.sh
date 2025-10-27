@@ -27,8 +27,8 @@ infoStr="#a sample comment"
 # In V3, the offset is zero on both forward and reversed reads.
 # In early V4 versions, the offset is -4 on a forward read and +4 on a reversed read.
 # In later V4 versions, the offset is 0 on both reads.
-# (Due to these unpredictable changes which are frustrating to keep track of,
-# we have stopped updating the instructions here.
+# (Due to these unpredictable changes by the DNAscent team which are frustrating to keep track of,
+# we have stopped updating the offset-related instructions here.
 # If detect -> mod BAM conversion does not work with a message like "Invalid thymidine position",
 # this is likely the issue. Please examine the .detect and the associated fasta reference genome 
 # to determine the offset yourself.)
@@ -83,6 +83,7 @@ sed "1i$infoStr" $detectFile |\
 # `print $1 + 4, $2, $3, substr($4, 5, 5) "N"`
 # We think this change happened after DNAscent 4.0.2 but we are not sure
 # and we have stopped keeping track of these position-offset changes.
+# Please see the introductory section in this file for more information.
 
 sed "1i$infoStr" $detectFile |\
   awk \
