@@ -25,7 +25,13 @@ infoStr="#a sample comment"
 # Unfortunately DNAscent detect offsets the position column by different amounts depending on the version:
 # In V2, on a forward read, the offset is zero, but on a reversed read the offset is -5.
 # In V3, the offset is zero on both forward and reversed reads.
-# In V4, the offset is -4 on a forward read and +4 on a reversed read.
+# In early V4 versions, the offset is -4 on a forward read and +4 on a reversed read.
+# In later V4 versions, the offset is 0 on both reads.
+# (Due to these unpredictable changes which are frustrating to keep track of,
+# we have stopped updating the instructions here.
+# If detect -> mod BAM conversion does not work with a message like "Invalid thymidine position",
+# this is likely the issue. Please examine the .detect and the associated fasta reference genome 
+# to determine the offset yourself.)
 # (By 'offset' we mean if the probability call is at base i, then DNascent reports i + offset in the position column).
 # This tool was first written for V2, so adjustments are made for V3 and V4 in the command below.
 # We do not use the six-mer or nine-mer sequence information in the detect -> modBAM conversion (as of this date).
@@ -69,8 +75,15 @@ sed "1i$infoStr" $detectFile |\
 # Then, you can invoke the script using --tag 000000+472552 as the argument and this would be the best way to tag the
 # EdU and BrdU modifications. As such an option is not available, we leave it to the user to decide what to do.
 
-# For v4:
-# =======
+# For v4 (for early and late variations, please read the comment below):
+# ======================================================================
+# If you are using an early V4 version, please use the command below.
+# If you are using a later V4 version, please remove the +4 and the -4 in lines
+# such as the one below:
+# `print $1 + 4, $2, $3, substr($4, 5, 5) "N"`
+# We think this change happened after DNAscent 4.0.2 but we are not sure
+# and we have stopped keeping track of these position-offset changes.
+
 sed "1i$infoStr" $detectFile |\
   awk \
     -v IFS="\t" -v OFS="\t" -v flag=0 \
